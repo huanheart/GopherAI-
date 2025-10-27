@@ -17,6 +17,13 @@ type EmailConfig struct {
 	Email    string `toml:"email" `
 }
 
+type RedisConfig struct {
+	RedisPort     int    `toml:"port"`
+	RedisDb       int    `toml:"db"`
+	RedisHost     string `toml:"host"`
+	RedisPassword string `toml:"password"`
+}
+
 type MysqlConfig struct {
 	MysqlPort         int    `toml:"port"`
 	MysqlHost         string `toml:"host"`
@@ -43,10 +50,19 @@ type Rabbitmq struct {
 
 type Config struct {
 	EmailConfig `toml:"emailConfig"`
+	RedisConfig `toml:"redisConfig"`
 	MysqlConfig `toml:"mysqlConfig"`
 	JwtConfig   `toml:"jwtConfig"`
 	MainConfig  `toml:"mainConfig"`
 	Rabbitmq    `toml:"rabbitmqConfig"`
+}
+
+type RedisKeyConfig struct {
+	CaptchaPrefix string
+}
+
+var DefaultRedisKeyConfig = RedisKeyConfig{
+	CaptchaPrefix: "captcha:",
 }
 
 var config *Config
