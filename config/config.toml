@@ -1,0 +1,29 @@
+[mainConfig]
+appName = "GopherAI"
+host = "0.0.0.0"
+port = 8001
+
+[emailConfig]
+authcode = "letluzytpsexdhcj"
+email = "3189769526@qq.com"
+
+[mysqlConfig]
+host = "127.0.0.1"
+port = 3306
+user = "root"
+password = "123456"
+databaseName = "GopherAI"
+charset =  "utf8mb4"
+
+[jwtConfig]
+ expire_duration= 8760
+ issuer= "huanheart"
+ subject= "GopherAI"
+ key= "GopherAI-v1"
+
+ [rabbitmqConfig]
+  host= "127.0.0.1"
+  port= 5672
+  username= "root"
+  password= "123456"
+  vhost= "/"
