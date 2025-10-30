@@ -1,6 +1,8 @@
 package router
 
 import (
+	"GopherAI/middleware/jwt"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -12,11 +14,17 @@ func InitRouter() *gin.Engine {
 		RegisterUserRouter(enterRouter.Group("/user"))
 	}
 	//后续登录的接口需要jwt鉴权
-	// {
-	// 	musicGroup := enterRouter.Group("/music")
-	// 	musicGroup.Use(jwt.Auth())
-	// 	MusicRouter(musicGroup)
-	// }
+	{
+		AIGroup := enterRouter.Group("/AI")
+		AIGroup.Use(jwt.Auth())
+		AIRouter(AIGroup)
+	}
+
+	{
+		ImageGroup := enterRouter.Group("/image")
+		ImageGroup.Use(jwt.Auth())
+		ImageRouter(ImageGroup)
+	}
 
 	return r
 }

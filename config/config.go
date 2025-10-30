@@ -62,7 +62,7 @@ type RedisKeyConfig struct {
 }
 
 var DefaultRedisKeyConfig = RedisKeyConfig{
-	CaptchaPrefix: "captcha:",
+	CaptchaPrefix: "captcha:%s",
 }
 
 var config *Config
