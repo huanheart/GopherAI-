@@ -3,6 +3,7 @@ package session
 import (
 	"GopherAI/common/aihelper"
 	"GopherAI/common/code"
+	"GopherAI/common/rabbitmq"
 	"GopherAI/dao/message"
 	"GopherAI/dao/session"
 	"GopherAI/model"
@@ -55,6 +56,13 @@ func CreateSessionAndSendMessage(userID int64, userQuestion string, modelType st
 	helper.AddMessage(userMsg)
 	//todo:后续这个改成消息队列异步处理
 	err = helper.SaveMessage(&userMsg, message.CreateMessage)
+
+	err = helper.SaveMessage(&userMsg, func(message *model.Message) (*model.Message, error) {
+		data := rabbitmq.GenerateMessageMQParam(createdSession.ID, userQuestion, userID)
+		err := rabbitmq.RMQMessage.Publish(data)
+		return message, err
+	})
+
 	if err != nil {
 		return "", "", code.CodeServerBusy
 	}
@@ -99,6 +107,7 @@ func ChatSend(userID int64, sessionID string, userQuestion string, modelType str
 	}
 	helper.AddMessage(userMsg)
 	//todo:后续这个改成消息队列异步处理
+	// err = helper.SaveMessage(&userMsg, message.CreateMessage)
 	err = helper.SaveMessage(&userMsg, message.CreateMessage)
 
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 type Message struct {
 	ID        string `gorm:"primaryKey;type:varchar(36)"`
 	SessionID string `gorm:"index;not null;type:varchar(36)"`
+	UserName  string `gorm:"type:varchar(20)"`
 	Content   string `gorm:"type:text"`
 	CreatedAt time.Time
 }

@@ -1,7 +1,8 @@
 package rabbitmq
 
 var (
-// RMQUpload          *RabbitMQ
+	// RMQUpload          *RabbitMQ
+	RMQMessage *RabbitMQ
 )
 
 func InitRabbitMQ() {
@@ -12,10 +13,14 @@ func InitRabbitMQ() {
 	// RMQUpload = NewWorkRabbitMQ("Upload")
 	// go RMQUpload.Consume(Upload)
 
+	RMQMessage = NewWorkRabbitMQ("Message")
+	go RMQMessage.Consume(MQMessage)
+
 }
 
 // DestroyRabbitMQ 销毁RabbitMQ
 
 func DestroyRabbitMQ() {
 	// RMQUpload.Destroy()
+	RMQMessage.Destroy()
 }
