@@ -1,36 +1,29 @@
 package session
 
 import (
+	"GopherAI/common/aihelper"
 	"GopherAI/common/code"
 	"GopherAI/dao/message"
 	"GopherAI/dao/session"
 	"GopherAI/model"
 )
 
-func GetUserSessionsByUserID(userID int64) (map[string][]model.Message, error) {
-	//获取用户的所有会话
-	sessions, err := session.GetSessionsByUserID(userID)
-	if err != nil {
-		return nil, err
+func GetUserSessionsByUserID(userID int64) ([]model.SessionInfo, error) {
+	//获取用户的所有会话ID
+
+	manager := aihelper.GetGlobalManager()
+	Sessions := manager.GetUserSessions(userID)
+
+	var SessionInfos []model.SessionInfo
+
+	for _, session := range Sessions {
+		SessionInfos = append(SessionInfos, model.SessionInfo{
+			SessionID: session,
+			Title:     session, // 暂时用sessionID作为标题，后续重构需要的时候可以更改
+		})
 	}
 
-	sessionIDs := make([]string, len(sessions))
-	for i, s := range sessions {
-		sessionIDs[i] = s.ID
-	}
-	//获取这些会话的所有消息（存在于会话表中，且与会话ID相关联）
-	//一次查询，而不是通过遍历sessionIDs多次查询mysql
-	allMsgs, err := message.GetMessagesBySessionIDs(sessionIDs)
-	if err != nil {
-		return nil, err
-	}
-
-	msgMap := make(map[string][]model.Message)
-	for _, msg := range allMsgs {
-		msgMap[msg.SessionID] = append(msgMap[msg.SessionID], msg)
-	}
-
-	return msgMap, nil
+	return SessionInfos, nil
 }
 
 func CreateSessionAndSendMessage(userID int64, userQuestion string, modelType string) (string, string, code.Code) {
@@ -44,29 +37,43 @@ func CreateSessionAndSendMessage(userID int64, userQuestion string, modelType st
 		return "", "", code.CodeServerBusy
 	}
 
-	//2：将用户问题存储为消息
-	userMessage := &model.Message{
+	//2：获取AIHelper并通过其管理消息
+	manager := aihelper.GetGlobalManager()
+	config := map[string]interface{}{
+		"apiKey": "your-api-key", // TODO: 从配置中获取
+	}
+	helper, err := manager.GetOrCreateAIHelper(userID, createdSession.ID, modelType, config)
+	if err != nil {
+		return "", "", code.CodeServerBusy
+	}
+
+	// 添加用户消息到AIHelper并保存到数据库
+	userMsg := model.Message{
 		SessionID: createdSession.ID,
 		Content:   userQuestion,
 	}
-	_, err = message.CreateMessage(userMessage)
+	helper.AddMessage(userMsg)
+	//todo:后续这个改成消息队列异步处理
+	err = helper.SaveMessage(&userMsg, message.CreateMessage)
 	if err != nil {
 		return "", "", code.CodeServerBusy
 	}
 
-	//3：调用AI模型获取回答
-	//todo：这个函数后续实现
-	aiResponse, err := GetAIResponse(userID, userQuestion, modelType)
+	//3：生成AI回复
+	var aiResponse string
+	aiResponse, err = helper.GenerateResponse(userQuestion)
 	if err != nil {
 		return "", "", code.CodeServerBusy
 	}
 
-	//4：将AI回答存储为消息
-	aiMessage := &model.Message{
+	// 添加AI回复到AIHelper并保存到数据库
+	aiMsg := model.Message{
 		SessionID: createdSession.ID,
 		Content:   aiResponse,
 	}
-	_, err = message.CreateMessage(aiMessage)
+	helper.AddMessage(aiMsg)
+	//todo:后续这个改成消息队列异步处理
+	err = helper.SaveMessage(&aiMsg, message.CreateMessage)
 	if err != nil {
 		return "", "", code.CodeServerBusy
 	}
@@ -75,30 +82,44 @@ func CreateSessionAndSendMessage(userID int64, userQuestion string, modelType st
 }
 
 func ChatSend(userID int64, sessionID string, userQuestion string, modelType string) (string, code.Code) {
-	var aiResponse string
-	//1：将用户问题存储为消息
-	userMessage := &model.Message{
+	//1：获取AIHelper
+	manager := aihelper.GetGlobalManager()
+	config := map[string]interface{}{
+		"apiKey": "your-api-key", // TODO: 从配置中获取
+	}
+	helper, err := manager.GetOrCreateAIHelper(userID, sessionID, modelType, config)
+	if err != nil {
+		return "", code.CodeServerBusy
+	}
+
+	// 添加用户消息到AIHelper并保存到数据库
+	userMsg := model.Message{
 		SessionID: sessionID,
 		Content:   userQuestion,
 	}
-	_, err := message.CreateMessage(userMessage)
+	helper.AddMessage(userMsg)
+	//todo:后续这个改成消息队列异步处理
+	err = helper.SaveMessage(&userMsg, message.CreateMessage)
+
 	if err != nil {
 		return "", code.CodeServerBusy
 	}
 
-	//2：调用AI模型获取回答
-	//todo：这个函数后续实现
-	aiResponse, err = GetAIResponse(userID, userQuestion, modelType)
+	//2：生成AI回复
+	var aiResponse string
+	aiResponse, err = helper.GenerateResponse(userQuestion)
 	if err != nil {
 		return "", code.CodeServerBusy
 	}
 
-	//3：将AI回答存储为消息
-	aiMessage := &model.Message{
+	// 添加AI回复到AIHelper并保存到数据库
+	aiMsg := model.Message{
 		SessionID: sessionID,
 		Content:   aiResponse,
 	}
-	_, err = message.CreateMessage(aiMessage)
+	helper.AddMessage(aiMsg)
+	//todo:后续这个改成消息队列异步处理
+	err = helper.SaveMessage(&aiMsg, message.CreateMessage)
 	if err != nil {
 		return "", code.CodeServerBusy
 	}
@@ -107,5 +128,24 @@ func ChatSend(userID int64, sessionID string, userQuestion string, modelType str
 }
 
 func GetChatHistory(userID int64, sessionID string) ([]model.History, code.Code) {
+	// 获取AIHelper中的消息历史
+	manager := aihelper.GetGlobalManager()
+	helper, exists := manager.GetAIHelper(userID, sessionID)
+	if !exists {
+		return nil, code.CodeServerBusy
+	}
 
+	messages := helper.GetMessages()
+	history := make([]model.History, 0, len(messages))
+
+	// 转换消息为历史格式（根据消息顺序或内容判断用户/AI消息）
+	for i, msg := range messages {
+		isUser := i%2 == 0
+		history = append(history, model.History{
+			IsUser:  isUser,
+			Content: msg.Content,
+		})
+	}
+
+	return history, code.CodeSuccess
 }

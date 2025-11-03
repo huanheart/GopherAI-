@@ -13,7 +13,7 @@ import (
 type (
 	GetUserSessionsResponse struct {
 		controller.Response
-		Data map[string][]interface{} `json:"data,omitempty"`
+		Sessions []model.SessionInfo `json:"sessions,omitempty"`
 	}
 	CreateSessionAndSendMessageRequest struct {
 		UserQuestion string `json:"question" binding:"required"`  // 用户问题;
@@ -46,8 +46,6 @@ type (
 	}
 )
 
-// 这个写错了  todo：待更改，因为这边应该只是获取当前用户所有的sessionID
-// 而这边的逻辑其实是应该放到初始化操作去的
 func GetUserSessionsByUserID(c *gin.Context) {
 	res := new(GetUserSessionsResponse)
 	userID := c.GetInt64("user_id") // From JWT middleware
@@ -58,23 +56,8 @@ func GetUserSessionsByUserID(c *gin.Context) {
 		return
 	}
 
-	// Convert []model.Message to []interface{} for JSON serialization
-	data := make(map[string][]interface{})
-	for sessionID, msgs := range userSessions {
-		msgsInterface := make([]interface{}, len(msgs))
-		for i, msg := range msgs {
-			msgsInterface[i] = map[string]interface{}{
-				"id":         msg.ID,
-				"session_id": msg.SessionID,
-				"content":    msg.Content,
-				"created_at": msg.CreatedAt,
-			}
-		}
-		data[sessionID] = msgsInterface
-	}
-
 	res.Success()
-	res.Data = data
+	res.Sessions = userSessions
 	c.JSON(http.StatusOK, res)
 }
 
