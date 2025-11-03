@@ -32,14 +32,14 @@ func Auth() gin.HandlerFunc {
 		}
 
 		log.Println("token is ", token)
-		claimsId, ok := myjwt.ParseToken(token)
+		userName, ok := myjwt.ParseToken(token)
 		if !ok {
 			c.JSON(http.StatusOK, res.CodeOf(code.CodeInvalidToken))
 			c.Abort()
 			return
 		}
 
-		c.Set("user_id", claimsId)
+		c.Set("userName", userName)
 		c.Next()
 	}
 }

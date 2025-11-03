@@ -6,27 +6,27 @@ import (
 
 // AIHelperManager AI助手管理器，管理用户-会话-AIHelper的映射关系
 type AIHelperManager struct {
-	helpers map[int64]map[string]*AIHelper // map[用户ID]map[会话ID]*AIHelper
+	helpers map[string]map[string]*AIHelper // map[用户ID]map[会话ID]*AIHelper
 	mu      sync.RWMutex
 }
 
 // NewAIHelperManager 创建新的管理器实例
 func NewAIHelperManager() *AIHelperManager {
 	return &AIHelperManager{
-		helpers: make(map[int64]map[string]*AIHelper),
+		helpers: make(map[string]map[string]*AIHelper),
 	}
 }
 
 // 获取或创建AIHelper
-func (m *AIHelperManager) GetOrCreateAIHelper(userID int64, sessionID string, modelType string, config map[string]interface{}) (*AIHelper, error) {
+func (m *AIHelperManager) GetOrCreateAIHelper(userName string, sessionID string, modelType string, config map[string]interface{}) (*AIHelper, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	// 获取用户的会话映射
-	userHelpers, exists := m.helpers[userID]
+	userHelpers, exists := m.helpers[userName]
 	if !exists {
 		userHelpers = make(map[string]*AIHelper)
-		m.helpers[userID] = userHelpers
+		m.helpers[userName] = userHelpers
 	}
 
 	// 检查会话是否已存在
@@ -47,11 +47,11 @@ func (m *AIHelperManager) GetOrCreateAIHelper(userID int64, sessionID string, mo
 }
 
 // 获取指定用户的指定会话的AIHelper
-func (m *AIHelperManager) GetAIHelper(userID int64, sessionID string) (*AIHelper, bool) {
+func (m *AIHelperManager) GetAIHelper(userName string, sessionID string) (*AIHelper, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	userHelpers, exists := m.helpers[userID]
+	userHelpers, exists := m.helpers[userName]
 	if !exists {
 		return nil, false
 	}
@@ -61,11 +61,11 @@ func (m *AIHelperManager) GetAIHelper(userID int64, sessionID string) (*AIHelper
 }
 
 // 移除指定用户的指定会话的AIHelper
-func (m *AIHelperManager) RemoveAIHelper(userID int64, sessionID string) {
+func (m *AIHelperManager) RemoveAIHelper(userName string, sessionID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	userHelpers, exists := m.helpers[userID]
+	userHelpers, exists := m.helpers[userName]
 	if !exists {
 		return
 	}
@@ -74,16 +74,16 @@ func (m *AIHelperManager) RemoveAIHelper(userID int64, sessionID string) {
 
 	// 如果用户没有会话了，清理用户映射
 	if len(userHelpers) == 0 {
-		delete(m.helpers, userID)
+		delete(m.helpers, userName)
 	}
 }
 
 // 获取指定用户的所有会话ID
-func (m *AIHelperManager) GetUserSessions(userID int64) []string {
+func (m *AIHelperManager) GetUserSessions(userName string) []string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	userHelpers, exists := m.helpers[userID]
+	userHelpers, exists := m.helpers[userName]
 	if !exists {
 		return []string{}
 	}

@@ -46,11 +46,11 @@ type (
 	}
 )
 
-func GetUserSessionsByUserID(c *gin.Context) {
+func GetUserSessionsByUserName(c *gin.Context) {
 	res := new(GetUserSessionsResponse)
-	userID := c.GetInt64("user_id") // From JWT middleware
+	userName := c.GetString("userName") // From JWT middleware
 
-	userSessions, err := session.GetUserSessionsByUserID(userID)
+	userSessions, err := session.GetUserSessionsByUserName(userName)
 	if err != nil {
 		c.JSON(http.StatusOK, res.CodeOf(code.CodeServerBusy))
 		return
@@ -64,13 +64,13 @@ func GetUserSessionsByUserID(c *gin.Context) {
 func CreateSessionAndSendMessage(c *gin.Context) {
 	req := new(CreateSessionAndSendMessageRequest)
 	res := new(CreateSessionAndSendMessageResponse)
-	userID := c.GetInt64("user_id") // From JWT middleware
+	userName := c.GetString("userName") // From JWT middleware
 	if err := c.ShouldBindJSON(req); err != nil {
 		c.JSON(http.StatusOK, res.CodeOf(code.CodeInvalidParams))
 		return
 	}
 	//内部会创建会话并发送消息，并会将AI回答、当前会话返回
-	session_id, aiInformation, code_ := session.CreateSessionAndSendMessage(userID, req.UserQuestion, req.ModelType)
+	session_id, aiInformation, code_ := session.CreateSessionAndSendMessage(userName, req.UserQuestion, req.ModelType)
 
 	if code_ != code.CodeSuccess {
 		c.JSON(http.StatusOK, res.CodeOf(code_))
@@ -86,13 +86,13 @@ func CreateSessionAndSendMessage(c *gin.Context) {
 func ChatSend(c *gin.Context) {
 	req := new(ChatSendRequest)
 	res := new(ChatSendResponse)
-	userID := c.GetInt64("user_id") // From JWT middleware
+	userName := c.GetString("userName") // From JWT middleware
 	if err := c.ShouldBindJSON(req); err != nil {
 		c.JSON(http.StatusOK, res.CodeOf(code.CodeInvalidParams))
 		return
 	}
 	// 发送消息，并会将AI回答返回
-	aiInformation, code_ := session.ChatSend(userID, req.SessionID, req.UserQuestion, req.ModelType)
+	aiInformation, code_ := session.ChatSend(userName, req.SessionID, req.UserQuestion, req.ModelType)
 
 	if code_ != code.CodeSuccess {
 		c.JSON(http.StatusOK, res.CodeOf(code_))
@@ -107,12 +107,12 @@ func ChatSend(c *gin.Context) {
 func ChatHistory(c *gin.Context) {
 	req := new(ChatHistoryRequest)
 	res := new(ChatHistoryResponse)
-	userID := c.GetInt64("user_id") // From JWT middleware
+	userName := c.GetString("userName") // From JWT middleware
 	if err := c.ShouldBindJSON(req); err != nil {
 		c.JSON(http.StatusOK, res.CodeOf(code.CodeInvalidParams))
 		return
 	}
-	history, code_ := session.GetChatHistory(userID, req.SessionID)
+	history, code_ := session.GetChatHistory(userName, req.SessionID)
 	if code_ != code.CodeSuccess {
 		c.JSON(http.StatusOK, res.CodeOf(code_))
 		return

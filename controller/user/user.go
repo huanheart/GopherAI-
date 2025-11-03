@@ -18,8 +18,7 @@ type (
 	// omitempty当字段为空的时候，不返回这个东西
 	LoginResponse struct {
 		controller.Response
-		UserID int64  `json:"user_id,omitempty"`
-		Token  string `json:"token,omitempty"`
+		Token string `json:"token,omitempty"`
 	}
 	//验证码由后端生成，存放到redis中，固然需要先发送一次请求CaptchaRequest,然后用返回的验证码
 	//邮箱以及密码进行注册，后续再将账号进行返回
@@ -31,8 +30,7 @@ type (
 	//注册成功之后，直接让其进行登录状态
 	RegisterResponse struct {
 		controller.Response
-		UserID int64  `json:"user_id,omitempty"`
-		Token  string `json:"token,omitempty"`
+		Token string `json:"token,omitempty"`
 	}
 
 	CaptchaRequest struct {
@@ -53,14 +51,14 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	userID, token, code_ := user.Login(req.Username, req.Password)
+	token, code_ := user.Login(req.Username, req.Password)
 	if code_ != code.CodeSuccess {
 		c.JSON(http.StatusOK, res.CodeOf(code_))
 		return
 	}
 
 	res.Success()
-	res.UserID, res.Token = userID, token
+	res.Token = token
 	c.JSON(http.StatusOK, res)
 
 }
@@ -74,14 +72,14 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	userID, token, code_ := user.Register(req.Email, req.Password, req.Captcha)
+	token, code_ := user.Register(req.Email, req.Password, req.Captcha)
 	if code_ != code.CodeSuccess {
 		c.JSON(http.StatusOK, res.CodeOf(code_))
 		return
 	}
 
 	res.Success()
-	res.UserID, res.Token = userID, token
+	res.Token = token
 	c.JSON(http.StatusOK, res)
 }
 

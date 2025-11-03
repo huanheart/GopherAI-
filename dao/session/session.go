@@ -5,9 +5,9 @@ import (
 	"GopherAI/model"
 )
 
-func GetSessionsByUserID(userID int64) ([]model.Session, error) {
+func GetSessionsByUserName(UserName int64) ([]model.Session, error) {
 	var sessions []model.Session
-	err := mysql.DB.Where("user_id = ?", userID).Find(&sessions).Error
+	err := mysql.DB.Where("user_name = ?", UserName).Find(&sessions).Error
 	return sessions, err
 }
 
