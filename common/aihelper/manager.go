@@ -6,7 +6,7 @@ import (
 
 // AIHelperManager AI助手管理器，管理用户-会话-AIHelper的映射关系
 type AIHelperManager struct {
-	helpers map[string]map[string]*AIHelper // map[用户ID]map[会话ID]*AIHelper
+	helpers map[string]map[string]*AIHelper // map[用户账号（唯一）]map[会话ID]*AIHelper
 	mu      sync.RWMutex
 }
 

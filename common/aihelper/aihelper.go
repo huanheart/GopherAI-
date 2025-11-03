@@ -20,7 +20,7 @@ func NewAIHelper(model_ AIModel) *AIHelper {
 	}
 }
 
-// AddMessage 添加消息到历史记录
+// AddMessage 添加消息到内存中（此时还没有保存到数据库中）
 func (a *AIHelper) AddMessage(msg model.Message) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -30,6 +30,7 @@ func (a *AIHelper) AddMessage(msg model.Message) {
 }
 
 // SaveMessage 保存消息到数据库（通过回调函数避免循环依赖）
+// 通过传入func，自己调用外部的保存函数，即可支持同步异步等多种策略
 func (a *AIHelper) SaveMessage(msg *model.Message, saveFunc func(*model.Message) (*model.Message, error)) error {
 	_, err := saveFunc(msg)
 	return err

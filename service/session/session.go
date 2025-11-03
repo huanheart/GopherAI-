@@ -4,7 +4,6 @@ import (
 	"GopherAI/common/aihelper"
 	"GopherAI/common/code"
 	"GopherAI/common/rabbitmq"
-	"GopherAI/dao/message"
 	"GopherAI/dao/session"
 	"GopherAI/model"
 )
@@ -54,9 +53,9 @@ func CreateSessionAndSendMessage(userName string, userQuestion string, modelType
 		Content:   userQuestion,
 	}
 	helper.AddMessage(userMsg)
-	//todo:后续这个改成消息队列异步处理
-	err = helper.SaveMessage(&userMsg, message.CreateMessage)
-
+	//同步插入到数据库
+	// err = helper.SaveMessage(&userMsg, message.CreateMessage)
+	//更改成消息队列异步处理
 	err = helper.SaveMessage(&userMsg, func(message *model.Message) (*model.Message, error) {
 		data := rabbitmq.GenerateMessageMQParam(createdSession.ID, userQuestion, userName)
 		err := rabbitmq.RMQMessage.Publish(data)
@@ -80,8 +79,14 @@ func CreateSessionAndSendMessage(userName string, userQuestion string, modelType
 		Content:   aiResponse,
 	}
 	helper.AddMessage(aiMsg)
-	//todo:后续这个改成消息队列异步处理
-	err = helper.SaveMessage(&aiMsg, message.CreateMessage)
+	//同步插入到数据库
+	// err = helper.SaveMessage(&aiMsg, message.CreateMessage)
+	//更改成消息队列异步处理
+	err = helper.SaveMessage(&userMsg, func(message *model.Message) (*model.Message, error) {
+		data := rabbitmq.GenerateMessageMQParam(createdSession.ID, userQuestion, userName)
+		err := rabbitmq.RMQMessage.Publish(data)
+		return message, err
+	})
 	if err != nil {
 		return "", "", code.CodeServerBusy
 	}
@@ -106,9 +111,14 @@ func ChatSend(userName string, sessionID string, userQuestion string, modelType 
 		Content:   userQuestion,
 	}
 	helper.AddMessage(userMsg)
-	//todo:后续这个改成消息队列异步处理
+	//同步插入到数据库
 	// err = helper.SaveMessage(&userMsg, message.CreateMessage)
-	err = helper.SaveMessage(&userMsg, message.CreateMessage)
+	//更改成消息队列异步处理
+	err = helper.SaveMessage(&userMsg, func(message *model.Message) (*model.Message, error) {
+		data := rabbitmq.GenerateMessageMQParam(sessionID, userQuestion, userName)
+		err := rabbitmq.RMQMessage.Publish(data)
+		return message, err
+	})
 
 	if err != nil {
 		return "", code.CodeServerBusy
@@ -127,8 +137,15 @@ func ChatSend(userName string, sessionID string, userQuestion string, modelType 
 		Content:   aiResponse,
 	}
 	helper.AddMessage(aiMsg)
-	//todo:后续这个改成消息队列异步处理
-	err = helper.SaveMessage(&aiMsg, message.CreateMessage)
+	//同步插入到数据库
+	// err = helper.SaveMessage(&userMsg, message.CreateMessage)
+	//更改成消息队列异步处理
+	err = helper.SaveMessage(&userMsg, func(message *model.Message) (*model.Message, error) {
+		data := rabbitmq.GenerateMessageMQParam(sessionID, userQuestion, userName)
+		err := rabbitmq.RMQMessage.Publish(data)
+		return message, err
+	})
+
 	if err != nil {
 		return "", code.CodeServerBusy
 	}
