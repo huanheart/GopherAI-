@@ -65,10 +65,14 @@ func (a *AIHelper) GetMessages() []*model.Message {
 // 同步生成
 func (a *AIHelper) GenerateResponse(userName string, ctx context.Context, userQuestion string) (*model.Message, error) {
 
+	//调用存储函数
+	a.AddMessage(userQuestion, userName, true, true)
+
 	a.mu.RLock()
 	//将model.Message转化成schema.Message
 	messages := utils.ConvertToSchemaMessages(a.messages)
 	a.mu.RUnlock()
+
 	//调用模型生成回复
 	schemaMsg, err := a.model.GenerateResponse(ctx, messages)
 	if err != nil {
@@ -79,7 +83,6 @@ func (a *AIHelper) GenerateResponse(userName string, ctx context.Context, userQu
 	modelMsg := utils.ConvertToModelMessage(a.SessionID, userName, schemaMsg)
 
 	//调用存储函数
-	a.AddMessage(userQuestion, userName, true, true)
 	a.AddMessage(modelMsg.Content, userName, false, true)
 
 	return modelMsg, nil
@@ -87,6 +90,10 @@ func (a *AIHelper) GenerateResponse(userName string, ctx context.Context, userQu
 
 // 流式生成
 func (a *AIHelper) StreamResponse(userName string, ctx context.Context, cb StreamCallback, userQuestion string) (*model.Message, error) {
+
+	//调用存储函数
+	a.AddMessage(userQuestion, userName, true, true)
+
 	a.mu.RLock()
 	messages := utils.ConvertToSchemaMessages(a.messages)
 	a.mu.RUnlock()
@@ -104,7 +111,6 @@ func (a *AIHelper) StreamResponse(userName string, ctx context.Context, cb Strea
 	}
 
 	//调用存储函数
-	a.AddMessage(userQuestion, userName, true, true)
 	a.AddMessage(modelMsg.Content, userName, false, true)
 
 	return modelMsg, nil

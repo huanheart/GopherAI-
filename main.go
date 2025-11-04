@@ -30,7 +30,8 @@ func readDataFromDB() error {
 	// 遍历数据库消息
 	for i := range msgs {
 		m := &msgs[i]
-		modelType := "gpt-4"
+		//默认openai模型
+		modelType := "1"
 		config := make(map[string]interface{})
 
 		// 创建对应的 AIHelper
@@ -39,6 +40,7 @@ func readDataFromDB() error {
 			log.Printf("[readDataFromDB] failed to create helper for user=%s session=%s: %v", m.UserName, m.SessionID, err)
 			continue
 		}
+		log.Println("readDataFromDB init:  ", helper.SessionID)
 		// 添加消息到内存中(不开启存储功能)
 		helper.AddMessage(m.Content, m.UserName, m.IsUser, false)
 	}

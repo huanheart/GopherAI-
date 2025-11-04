@@ -6,6 +6,9 @@ import (
 	"GopherAI/dao/session"
 	"GopherAI/model"
 	"context"
+	"log"
+
+	"github.com/google/uuid"
 )
 
 var ctx = context.Background()
@@ -31,11 +34,13 @@ func GetUserSessionsByUserName(userName string) ([]model.SessionInfo, error) {
 func CreateSessionAndSendMessage(userName string, userQuestion string, modelType string) (string, string, code.Code) {
 	//1：创建一个新的会话
 	newSession := &model.Session{
+		ID:       uuid.New().String(),
 		UserName: userName,
 		Title:    userQuestion, // 可以根据需求设置标题，这边暂时用用户第一次的问题作为标题
 	}
 	createdSession, err := session.CreateSession(newSession)
 	if err != nil {
+		log.Println("CreateSessionAndSendMessage CreateSession error:", err)
 		return "", "", code.CodeServerBusy
 	}
 
@@ -46,12 +51,14 @@ func CreateSessionAndSendMessage(userName string, userQuestion string, modelType
 	}
 	helper, err := manager.GetOrCreateAIHelper(userName, createdSession.ID, modelType, config)
 	if err != nil {
+		log.Println("CreateSessionAndSendMessage GetOrCreateAIHelper error:", err)
 		return "", "", code.AIModelFail
 	}
 
 	//3：生成AI回复
 	aiResponse, err_ := helper.GenerateResponse(userName, ctx, userQuestion)
 	if err_ != nil {
+		log.Println("CreateSessionAndSendMessage GenerateResponse error:", err_)
 		return "", "", code.AIModelFail
 	}
 
@@ -66,12 +73,14 @@ func ChatSend(userName string, sessionID string, userQuestion string, modelType 
 	}
 	helper, err := manager.GetOrCreateAIHelper(userName, sessionID, modelType, config)
 	if err != nil {
+		log.Println("ChatSend GetOrCreateAIHelper error:", err)
 		return "", code.AIModelFail
 	}
 
 	//2：生成AI回复
 	aiResponse, err_ := helper.GenerateResponse(userName, ctx, userQuestion)
 	if err_ != nil {
+		log.Println("ChatSend GenerateResponse error:", err_)
 		return "", code.AIModelFail
 	}
 

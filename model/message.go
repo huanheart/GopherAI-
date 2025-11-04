@@ -5,12 +5,12 @@ import (
 )
 
 type Message struct {
-	ID        string `gorm:"primaryKey;type:varchar(36)"`
-	SessionID string `gorm:"index;not null;type:varchar(36)"`
-	UserName  string `gorm:"type:varchar(20)"`
-	Content   string `gorm:"type:text"`
-	IsUser    bool   `gorm:"not null;default:true"`
-	CreatedAt time.Time
+	ID        uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	SessionID string    `gorm:"index;not null;type:varchar(36)" json:"session_id"`
+	UserName  string    `gorm:"type:varchar(20)" json:"username"`
+	Content   string    `gorm:"type:text" json:"content"`
+	IsUser    bool      `gorm:"not null;default:true" json:"is_user"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type History struct {
