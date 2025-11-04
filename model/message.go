@@ -9,6 +9,7 @@ type Message struct {
 	SessionID string `gorm:"index;not null;type:varchar(36)"`
 	UserName  string `gorm:"type:varchar(20)"`
 	Content   string `gorm:"type:text"`
+	IsUser    bool   `gorm:"not null;default:true"`
 	CreatedAt time.Time
 }
 

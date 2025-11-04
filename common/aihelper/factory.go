@@ -38,14 +38,6 @@ func (f *AIModelFactory) registerCreators() {
 		return &OpenAIModel{apiKey: apiKey}, nil
 	}
 
-	f.creators["deepseek"] = func(config map[string]interface{}) (AIModel, error) {
-		apiKey, ok := config["apiKey"].(string)
-		if !ok {
-			return nil, fmt.Errorf("DeepSeek model requires apiKey")
-		}
-		return &DeepSeekModel{apiKey: apiKey}, nil
-	}
-
 	f.creators["ollama"] = func(config map[string]interface{}) (AIModel, error) {
 		modelName, ok := config["modelName"].(string)
 		if !ok {

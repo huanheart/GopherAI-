@@ -6,7 +6,10 @@ import (
 	"GopherAI/common/rabbitmq"
 	"GopherAI/dao/session"
 	"GopherAI/model"
+	"context"
 )
+
+var ctx = context.Background()
 
 func GetUserSessionsByUserName(userName string) ([]model.SessionInfo, error) {
 	//获取用户的所有会话ID
@@ -48,11 +51,7 @@ func CreateSessionAndSendMessage(userName string, userQuestion string, modelType
 	}
 
 	// 添加用户消息到AIHelper并保存到数据库
-	userMsg := model.Message{
-		SessionID: createdSession.ID,
-		Content:   userQuestion,
-	}
-	helper.AddMessage(userMsg)
+	helper.AddMessage(SessionID, Content, UserName, IsUser)
 	//同步插入到数据库
 	// err = helper.SaveMessage(&userMsg, message.CreateMessage)
 	//更改成消息队列异步处理
@@ -67,18 +66,19 @@ func CreateSessionAndSendMessage(userName string, userQuestion string, modelType
 	}
 
 	//3：生成AI回复
-	var aiResponse string
-	aiResponse, err = helper.GenerateResponse(userQuestion)
-	if err != nil {
+	aiResponse, err_ := helper.GenerateResponse(ctx)
+	if err_ != nil {
 		return "", "", code.CodeServerBusy
 	}
 
 	// 添加AI回复到AIHelper并保存到数据库
 	aiMsg := model.Message{
 		SessionID: createdSession.ID,
-		Content:   aiResponse,
+		Content:   aiResponse.Content,
+		UserName:  userName,
+		IsUser:    false,
 	}
-	helper.AddMessage(aiMsg)
+	helper.AddMessage(&aiMsg)
 	//同步插入到数据库
 	// err = helper.SaveMessage(&aiMsg, message.CreateMessage)
 	//更改成消息队列异步处理
@@ -91,7 +91,7 @@ func CreateSessionAndSendMessage(userName string, userQuestion string, modelType
 		return "", "", code.CodeServerBusy
 	}
 
-	return createdSession.ID, aiResponse, code.CodeSuccess
+	return createdSession.ID, aiResponse.Content, code.CodeSuccess
 }
 
 func ChatSend(userName string, sessionID string, userQuestion string, modelType string) (string, code.Code) {
