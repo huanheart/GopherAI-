@@ -112,7 +112,7 @@ export default {
 
     const loadSessions = async () => {
       try {
-        const response = await api.get('/chat/sessions')
+        const response = await api.get('/AI/chat/sessions')
         if (response.data.status_code === 1000 && Array.isArray(response.data.sessions)) {
           const sessionMap = {}
           response.data.sessions.forEach(s => {
@@ -142,7 +142,7 @@ export default {
 
       if (!sessions.value[sessionId].messages || sessions.value[sessionId].messages.length === 0) {
         try {
-          const response = await api.post('/chat/history', { sessionId: currentSessionId.value })
+          const response = await api.post('/AI/chat/history', { sessionId: currentSessionId.value })
           if (response.data.status_code === 1000 && Array.isArray(response.data.history)) {
             const messages = []
             response.data.history.forEach(item => {
@@ -170,7 +170,7 @@ export default {
       }
 
       try {
-        const response = await api.post('/chat/history', { sessionId: currentSessionId.value })
+        const response = await api.post('/AI/chat/history', { sessionId: currentSessionId.value })
         if (response.data.status_code === 1000 && Array.isArray(response.data.history)) {
           const messages = []
           response.data.history.forEach(item => {
@@ -214,7 +214,7 @@ export default {
 
         if (tempSession.value) {
           // 新会话
-          const response = await api.post('/chat/send-new-session', {
+          const response = await api.post('/AI/chat/send-new-session', {
             question: currentInput,
             modelType: selectedModel.value
           })
@@ -243,7 +243,7 @@ export default {
           // 继续会话
           sessions.value[currentSessionId.value].messages.push(userMessage)
 
-          const response = await api.post('/chat/send', {
+          const response = await api.post('/AI/chat/send', {
             question: currentInput,
             modelType: selectedModel.value,
             sessionId: currentSessionId.value

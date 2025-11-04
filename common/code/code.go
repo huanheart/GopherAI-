@@ -22,8 +22,9 @@ const (
 
 	CodeServerBusy Code = 4001
 
-	FileNotFind    Code = 5001
-	FileCannotOpen Code = 5002
+	AIModelNotFind    Code = 5001
+	AIModelCannotOpen Code = 5002
+	AIModelFail       Code = 5003
 )
 
 var msg = map[Code]string{
@@ -44,8 +45,9 @@ var msg = map[Code]string{
 
 	CodeServerBusy: "服务繁忙",
 
-	FileNotFind:    "文件不存在",
-	FileCannotOpen: "文件打开失败",
+	AIModelNotFind:    "模型不存在",
+	AIModelCannotOpen: "无法打开模型",
+	AIModelFail:       "模型运行失败",
 }
 
 func (code Code) Code() int64 {

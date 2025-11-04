@@ -46,17 +46,13 @@ func CreateSessionAndSendMessage(userName string, userQuestion string, modelType
 	}
 	helper, err := manager.GetOrCreateAIHelper(userName, createdSession.ID, modelType, config)
 	if err != nil {
-		return "", "", code.CodeServerBusy
+		return "", "", code.AIModelFail
 	}
 
 	//3：生成AI回复
 	aiResponse, err_ := helper.GenerateResponse(userName, ctx, userQuestion)
 	if err_ != nil {
-		return "", "", code.CodeServerBusy
-	}
-
-	if err != nil {
-		return "", "", code.CodeServerBusy
+		return "", "", code.AIModelFail
 	}
 
 	return createdSession.ID, aiResponse.Content, code.CodeSuccess
@@ -70,17 +66,13 @@ func ChatSend(userName string, sessionID string, userQuestion string, modelType 
 	}
 	helper, err := manager.GetOrCreateAIHelper(userName, sessionID, modelType, config)
 	if err != nil {
-		return "", code.CodeServerBusy
+		return "", code.AIModelFail
 	}
 
 	//2：生成AI回复
 	aiResponse, err_ := helper.GenerateResponse(userName, ctx, userQuestion)
 	if err_ != nil {
-		return "", code.CodeServerBusy
-	}
-
-	if err != nil {
-		return "", code.CodeServerBusy
+		return "", code.AIModelFail
 	}
 
 	return aiResponse.Content, code.CodeSuccess

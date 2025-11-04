@@ -33,12 +33,12 @@ func GetGlobalFactory() *AIModelFactory {
 // 注册模型
 func (f *AIModelFactory) registerCreators() {
 	//OpenAI
-	f.creators["openai"] = func(ctx context.Context, config map[string]interface{}) (AIModel, error) {
+	f.creators["1"] = func(ctx context.Context, config map[string]interface{}) (AIModel, error) {
 		return NewOpenAIModel(ctx)
 	}
 
 	//Ollama
-	f.creators["ollama"] = func(ctx context.Context, config map[string]interface{}) (AIModel, error) {
+	f.creators["2"] = func(ctx context.Context, config map[string]interface{}) (AIModel, error) {
 		baseURL, _ := config["baseURL"].(string)
 		modelName, ok := config["modelName"].(string)
 		if !ok {
