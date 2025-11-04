@@ -1,23 +1,25 @@
 package aihelper
 
 import (
+	"context"
 	"fmt"
 	"sync"
 )
 
-// ModelCreator 定义模型创建函数类型
-type ModelCreator func(config map[string]interface{}) (AIModel, error)
+// ModelCreator 定义模型创建函数类型（需要 context）
+type ModelCreator func(ctx context.Context, config map[string]interface{}) (AIModel, error)
 
 // AIModelFactory AI模型工厂
 type AIModelFactory struct {
 	creators map[string]ModelCreator
 }
 
-// 全局工厂实例
-var globalFactory *AIModelFactory
-var factoryOnce sync.Once
+var (
+	globalFactory *AIModelFactory
+	factoryOnce   sync.Once
+)
 
-// GetGlobalFactory 获取全局工厂实例
+// GetGlobalFactory 获取全局单例
 func GetGlobalFactory() *AIModelFactory {
 	factoryOnce.Do(func() {
 		globalFactory = &AIModelFactory{
@@ -28,44 +30,43 @@ func GetGlobalFactory() *AIModelFactory {
 	return globalFactory
 }
 
-// registerCreators 注册所有模型创建器
+// 注册模型
 func (f *AIModelFactory) registerCreators() {
-	f.creators["openai"] = func(config map[string]interface{}) (AIModel, error) {
-		apiKey, ok := config["apiKey"].(string)
-		if !ok {
-			return nil, fmt.Errorf("OpenAI model requires apiKey")
-		}
-		return &OpenAIModel{apiKey: apiKey}, nil
+	//OpenAI
+	f.creators["openai"] = func(ctx context.Context, config map[string]interface{}) (AIModel, error) {
+		return NewOpenAIModel(ctx)
 	}
 
-	f.creators["ollama"] = func(config map[string]interface{}) (AIModel, error) {
+	//Ollama
+	f.creators["ollama"] = func(ctx context.Context, config map[string]interface{}) (AIModel, error) {
+		baseURL, _ := config["baseURL"].(string)
 		modelName, ok := config["modelName"].(string)
 		if !ok {
 			return nil, fmt.Errorf("Ollama model requires modelName")
 		}
-		return &OllamaModel{modelName: modelName}, nil
+		return NewOllamaModel(ctx, baseURL, modelName)
 	}
 }
 
-// CreateAIModel 根据模型类型创建对应的AI模型
-func (f *AIModelFactory) CreateAIModel(modelType string, config map[string]interface{}) (AIModel, error) {
-	creator, exists := f.creators[modelType]
-	if !exists {
+// CreateAIModel 根据类型创建 AI 模型
+func (f *AIModelFactory) CreateAIModel(ctx context.Context, modelType string, config map[string]interface{}) (AIModel, error) {
+	creator, ok := f.creators[modelType]
+	if !ok {
 		return nil, fmt.Errorf("unsupported model type: %s", modelType)
 	}
-	return creator(config)
+	return creator(ctx, config)
 }
 
-// CreateAIHelper 创建AIHelper实例
-func (f *AIModelFactory) CreateAIHelper(modelType string, config map[string]interface{}) (*AIHelper, error) {
-	model, err := f.CreateAIModel(modelType, config)
+// CreateAIHelper 一键创建 AIHelper
+func (f *AIModelFactory) CreateAIHelper(ctx context.Context, modelType string, SessionID string, config map[string]interface{}) (*AIHelper, error) {
+	model, err := f.CreateAIModel(ctx, modelType, config)
 	if err != nil {
 		return nil, err
 	}
-	return NewAIHelper(model), nil
+	return NewAIHelper(model, SessionID), nil
 }
 
-// RegisterModel 动态注册新的模型类型（可选，用于扩展）
+// RegisterModel 可扩展注册
 func (f *AIModelFactory) RegisterModel(modelType string, creator ModelCreator) {
 	f.creators[modelType] = creator
 }

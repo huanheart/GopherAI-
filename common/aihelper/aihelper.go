@@ -1,6 +1,7 @@
 package aihelper
 
 import (
+	"GopherAI/common/rabbitmq"
 	"GopherAI/model"
 	"GopherAI/utils"
 	"context"
@@ -18,15 +19,22 @@ type AIHelper struct {
 }
 
 // NewAIHelper 创建新的AIHelper实例
-func NewAIHelper(model_ AIModel) *AIHelper {
+func NewAIHelper(model_ AIModel, SessionID string) *AIHelper {
 	return &AIHelper{
 		model:    model_,
 		messages: make([]*model.Message, 0),
+		//异步推送到消息队列中
+		saveFunc: func(msg *model.Message) (*model.Message, error) {
+			data := rabbitmq.GenerateMessageMQParam(msg.SessionID, msg.Content, msg.UserName, msg.IsUser)
+			err := rabbitmq.RMQMessage.Publish(data)
+			return msg, err
+		},
+		SessionID: SessionID,
 	}
 }
 
-// AddMessage 添加消息到内存中（此时还没有保存到数据库中）
-func (a *AIHelper) AddMessage(Content string, UserName string, IsUser bool) {
+// addMessage 添加消息到内存中并调用自定义存储函数
+func (a *AIHelper) AddMessage(Content string, UserName string, IsUser bool, Save bool) {
 	userMsg := model.Message{
 		SessionID: a.SessionID,
 		Content:   Content,
@@ -34,7 +42,9 @@ func (a *AIHelper) AddMessage(Content string, UserName string, IsUser bool) {
 		IsUser:    IsUser,
 	}
 	a.messages = append(a.messages, &userMsg)
-	a.saveFunc(&userMsg)
+	if Save {
+		a.saveFunc(&userMsg)
+	}
 }
 
 // SaveMessage 保存消息到数据库（通过回调函数避免循环依赖）
@@ -53,7 +63,8 @@ func (a *AIHelper) GetMessages() []*model.Message {
 }
 
 // 同步生成
-func (a *AIHelper) GenerateResponse(userName string, ctx context.Context) (*model.Message, error) {
+func (a *AIHelper) GenerateResponse(userName string, ctx context.Context, userQuestion string) (*model.Message, error) {
+
 	a.mu.RLock()
 	//将model.Message转化成schema.Message
 	messages := utils.ConvertToSchemaMessages(a.messages)
@@ -66,14 +77,16 @@ func (a *AIHelper) GenerateResponse(userName string, ctx context.Context) (*mode
 
 	//将schema.Message转化成model.Message
 	modelMsg := utils.ConvertToModelMessage(a.SessionID, userName, schemaMsg)
+
 	//调用存储函数
-	a.saveFunc(modelMsg)
+	a.AddMessage(userQuestion, userName, true, true)
+	a.AddMessage(modelMsg.Content, userName, false, true)
 
 	return modelMsg, nil
 }
 
 // 流式生成
-func (a *AIHelper) StreamResponse(userName string, ctx context.Context, cb StreamCallback) (*model.Message, error) {
+func (a *AIHelper) StreamResponse(userName string, ctx context.Context, cb StreamCallback, userQuestion string) (*model.Message, error) {
 	a.mu.RLock()
 	messages := utils.ConvertToSchemaMessages(a.messages)
 	a.mu.RUnlock()
@@ -82,15 +95,18 @@ func (a *AIHelper) StreamResponse(userName string, ctx context.Context, cb Strea
 	if err != nil {
 		return nil, err
 	}
-	//将schema.Message转化成model.Message
+	//转化成model.Message
 	modelMsg := &model.Message{
 		SessionID: a.SessionID,
 		UserName:  userName,
 		Content:   content,
 		IsUser:    false,
 	}
+
 	//调用存储函数
-	a.saveFunc(modelMsg)
+	a.AddMessage(userQuestion, userName, true, true)
+	a.AddMessage(modelMsg.Content, userName, false, true)
+
 	return modelMsg, nil
 }
 

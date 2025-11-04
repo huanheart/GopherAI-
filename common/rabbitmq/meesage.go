@@ -15,12 +15,12 @@ type MessageMQParam struct {
 	IsUser    bool   `json:"is_user"`
 }
 
-func GenerateMessageMQParam(sessionID string, content string, userName string) []byte {
+func GenerateMessageMQParam(sessionID string, content string, userName string, IsUser bool) []byte {
 	param := MessageMQParam{
 		SessionID: sessionID,
 		Content:   content,
 		UserName:  userName,
-		IsUser:    true,
+		IsUser:    IsUser,
 	}
 	data, _ := json.Marshal(param)
 	return data

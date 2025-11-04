@@ -19,35 +19,32 @@ func StartServer(addr string, port int) error {
 	return r.Run(fmt.Sprintf("%s:%d", addr, port))
 }
 
+// 从数据库加载消息并初始化 AIHelperManager
 func readDataFromDB() error {
 	manager := aihelper.GetGlobalManager()
-	//从数据库中加载已有的会话和消息到内存中
+	// 从数据库读取所有消息
 	msgs, err := message.GetAllMessages()
 	if err != nil {
 		return err
 	}
-
-	// 2. 遍历并放入 manager
+	// 遍历数据库消息
 	for i := range msgs {
 		m := &msgs[i]
-		//默认类型
 		modelType := "gpt-4"
 		config := make(map[string]interface{})
 
-		// 从 manager 获取或创建 AIHelper
+		// 创建对应的 AIHelper
 		helper, err := manager.GetOrCreateAIHelper(m.UserName, m.SessionID, modelType, config)
 		if err != nil {
-			log.Printf("readDataFromDB: failed to create helper for user=%s session=%s: %v", m.UserName, m.SessionID, err)
+			log.Printf("[readDataFromDB] failed to create helper for user=%s session=%s: %v", m.UserName, m.SessionID, err)
 			continue
 		}
-
-		// 添加消息到内存
-		helper.AddMessage(*m)
+		// 添加消息到内存中(不开启存储功能)
+		helper.AddMessage(m.Content, m.UserName, m.IsUser, false)
 	}
 
-	log.Println("AIHelperManager init success  ", manager)
+	log.Println("AIHelperManager init success ")
 	return nil
-
 }
 
 func main() {

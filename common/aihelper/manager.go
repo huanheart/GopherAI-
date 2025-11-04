@@ -1,8 +1,11 @@
 package aihelper
 
 import (
+	"context"
 	"sync"
 )
+
+var ctx = context.Background()
 
 // AIHelperManager AI助手管理器，管理用户-会话-AIHelper的映射关系
 type AIHelperManager struct {
@@ -37,7 +40,7 @@ func (m *AIHelperManager) GetOrCreateAIHelper(userName string, sessionID string,
 
 	// 创建新的AIHelper
 	factory := GetGlobalFactory()
-	helper, err := factory.CreateAIHelper(modelType, config)
+	helper, err := factory.CreateAIHelper(ctx, modelType, sessionID, config)
 	if err != nil {
 		return nil, err
 	}

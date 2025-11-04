@@ -3,7 +3,6 @@ package session
 import (
 	"GopherAI/common/aihelper"
 	"GopherAI/common/code"
-	"GopherAI/common/rabbitmq"
 	"GopherAI/dao/session"
 	"GopherAI/model"
 	"context"
@@ -50,43 +49,12 @@ func CreateSessionAndSendMessage(userName string, userQuestion string, modelType
 		return "", "", code.CodeServerBusy
 	}
 
-	// 添加用户消息到AIHelper并保存到数据库
-	helper.AddMessage(SessionID, Content, UserName, IsUser)
-	//同步插入到数据库
-	// err = helper.SaveMessage(&userMsg, message.CreateMessage)
-	//更改成消息队列异步处理
-	err = helper.SaveMessage(&userMsg, func(message *model.Message) (*model.Message, error) {
-		data := rabbitmq.GenerateMessageMQParam(createdSession.ID, userQuestion, userName)
-		err := rabbitmq.RMQMessage.Publish(data)
-		return message, err
-	})
-
-	if err != nil {
-		return "", "", code.CodeServerBusy
-	}
-
 	//3：生成AI回复
-	aiResponse, err_ := helper.GenerateResponse(ctx)
+	aiResponse, err_ := helper.GenerateResponse(userName, ctx, userQuestion)
 	if err_ != nil {
 		return "", "", code.CodeServerBusy
 	}
 
-	// 添加AI回复到AIHelper并保存到数据库
-	aiMsg := model.Message{
-		SessionID: createdSession.ID,
-		Content:   aiResponse.Content,
-		UserName:  userName,
-		IsUser:    false,
-	}
-	helper.AddMessage(&aiMsg)
-	//同步插入到数据库
-	// err = helper.SaveMessage(&aiMsg, message.CreateMessage)
-	//更改成消息队列异步处理
-	err = helper.SaveMessage(&userMsg, func(message *model.Message) (*model.Message, error) {
-		data := rabbitmq.GenerateMessageMQParam(createdSession.ID, userQuestion, userName)
-		err := rabbitmq.RMQMessage.Publish(data)
-		return message, err
-	})
 	if err != nil {
 		return "", "", code.CodeServerBusy
 	}
@@ -105,52 +73,17 @@ func ChatSend(userName string, sessionID string, userQuestion string, modelType 
 		return "", code.CodeServerBusy
 	}
 
-	// 添加用户消息到AIHelper并保存到数据库
-	userMsg := model.Message{
-		SessionID: sessionID,
-		Content:   userQuestion,
-	}
-	helper.AddMessage(userMsg)
-	//同步插入到数据库
-	// err = helper.SaveMessage(&userMsg, message.CreateMessage)
-	//更改成消息队列异步处理
-	err = helper.SaveMessage(&userMsg, func(message *model.Message) (*model.Message, error) {
-		data := rabbitmq.GenerateMessageMQParam(sessionID, userQuestion, userName)
-		err := rabbitmq.RMQMessage.Publish(data)
-		return message, err
-	})
-
-	if err != nil {
-		return "", code.CodeServerBusy
-	}
-
 	//2：生成AI回复
-	var aiResponse string
-	aiResponse, err = helper.GenerateResponse(userQuestion)
-	if err != nil {
+	aiResponse, err_ := helper.GenerateResponse(userName, ctx, userQuestion)
+	if err_ != nil {
 		return "", code.CodeServerBusy
 	}
-
-	// 添加AI回复到AIHelper并保存到数据库
-	aiMsg := model.Message{
-		SessionID: sessionID,
-		Content:   aiResponse,
-	}
-	helper.AddMessage(aiMsg)
-	//同步插入到数据库
-	// err = helper.SaveMessage(&userMsg, message.CreateMessage)
-	//更改成消息队列异步处理
-	err = helper.SaveMessage(&userMsg, func(message *model.Message) (*model.Message, error) {
-		data := rabbitmq.GenerateMessageMQParam(sessionID, userQuestion, userName)
-		err := rabbitmq.RMQMessage.Publish(data)
-		return message, err
-	})
 
 	if err != nil {
 		return "", code.CodeServerBusy
 	}
 
-	return aiResponse, code.CodeSuccess
+	return aiResponse.Content, code.CodeSuccess
 }
 
 func GetChatHistory(userName string, sessionID string) ([]model.History, code.Code) {
