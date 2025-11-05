@@ -7,7 +7,9 @@ import (
 	"GopherAI/model"
 	"context"
 	"log"
+	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -65,6 +67,45 @@ func CreateSessionAndSendMessage(userName string, userQuestion string, modelType
 	return createdSession.ID, aiResponse.Content, code.CodeSuccess
 }
 
+func CreateStreamSessionAndSendMessage(userName string, userQuestion string, modelType string, writer gin.ResponseWriter) (string, code.Code) {
+	//1：创建一个新的会话
+	newSession := &model.Session{
+		ID:       uuid.New().String(),
+		UserName: userName,
+		Title:    userQuestion,
+	}
+	createdSession, err := session.CreateSession(newSession)
+	if err != nil {
+		log.Println("CreateStreamSessionAndSendMessage CreateSession error:", err)
+		return "", code.CodeServerBusy
+	}
+
+	//2：获取AIHelper并通过其管理消息
+	manager := aihelper.GetGlobalManager()
+	config := map[string]interface{}{
+		"apiKey": "your-api-key", // TODO: 从配置中获取
+	}
+	helper, err := manager.GetOrCreateAIHelper(userName, createdSession.ID, modelType, config)
+	if err != nil {
+		log.Println("CreateStreamSessionAndSendMessage GetOrCreateAIHelper error:", err)
+		return "", code.AIModelFail
+	}
+
+	//3：生成流式AI回复
+	cb := func(msg string) {
+		writer.WriteString("data: " + msg + "\n\n")
+		writer.(http.Flusher).Flush()
+	}
+
+	_, err_ := helper.StreamResponse(userName, ctx, cb, userQuestion)
+	if err_ != nil {
+		log.Println("CreateStreamSessionAndSendMessage StreamResponse error:", err_)
+		return "", code.AIModelFail
+	}
+
+	return createdSession.ID, code.CodeSuccess
+}
+
 func ChatSend(userName string, sessionID string, userQuestion string, modelType string) (string, code.Code) {
 	//1：获取AIHelper
 	manager := aihelper.GetGlobalManager()
@@ -108,4 +149,30 @@ func GetChatHistory(userName string, sessionID string) ([]model.History, code.Co
 	}
 
 	return history, code.CodeSuccess
+}
+
+func ChatStreamSend(userName string, sessionID string, userQuestion string, modelType string, writer gin.ResponseWriter) code.Code {
+	//1：获取AIHelper
+	manager := aihelper.GetGlobalManager()
+	config := map[string]interface{}{
+		"apiKey": "your-api-key", // TODO: 从配置中获取
+	}
+	helper, err := manager.GetOrCreateAIHelper(userName, sessionID, modelType, config)
+	if err != nil {
+		log.Println("ChatStreamSend GetOrCreateAIHelper error:", err)
+		return code.AIModelFail
+	}
+
+	//2：生成流式AI回复
+	cb := func(msg string) {
+		writer.WriteString("data: " + msg + "\n\n")
+		writer.(http.Flusher).Flush()
+	}
+	_, err_ := helper.StreamResponse(userName, ctx, cb, userQuestion)
+	if err_ != nil {
+		log.Println("ChatStreamSend StreamResponse error:", err_)
+		return code.AIModelFail
+	}
+
+	return code.CodeSuccess
 }

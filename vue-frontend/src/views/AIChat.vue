@@ -30,6 +30,10 @@
           <option value="3">百炼RAG</option>
           <option value="4">阿里百炼MCP</option>
         </select>
+        <label for="streamingMode" style="margin-left: 20px;">
+          <input type="checkbox" id="streamingMode" v-model="isStreaming" />
+          流式响应
+        </label>
       </div>
 
       <div class="chat-messages" ref="messagesRef">
@@ -85,6 +89,7 @@ export default {
     const messagesRef = ref()
     const messageInput = ref()
     const selectedModel = ref('1')
+    const isStreaming = ref(false)
 
     // Markdown渲染函数（简化版）
     const renderMarkdown = (text) => {
@@ -215,58 +220,146 @@ export default {
       try {
         loading.value = true
 
-        if (tempSession.value) {
-          // 新会话
-          const response = await api.post('/AI/chat/send-new-session', {
-            question: currentInput,
-            modelType: selectedModel.value
-          })
-
-          if (response.data.status_code === 1000) {
-            const sessionId = String(response.data.sessionId)
+        if (isStreaming.value) {
+          // 流式响应
+          if (tempSession.value) {
+            // 新会话流式
+            const eventSource = new EventSource(`/api/AI/chat/send-stream-new-session?question=${encodeURIComponent(currentInput)}&modelType=${selectedModel.value}`)
+            let aiContent = ''
             const aiMessage = {
               role: 'assistant',
-              content: response.data.Information
+              content: ''
+            }
+            currentMessages.value.push(aiMessage)
+
+            eventSource.onmessage = (event) => {
+              aiContent += event.data
+              aiMessage.content = aiContent
             }
 
-            sessions.value[sessionId] = {
-              id: sessionId,
-              name: '新会话',
-              messages: [userMessage, aiMessage]
+            eventSource.addEventListener('session', (event) => {
+              const data = JSON.parse(event.data)
+              const sessionId = String(data.sessionId)
+              sessions.value[sessionId] = {
+                id: sessionId,
+                name: '新会话',
+                messages: [userMessage, aiMessage]
+              }
+              currentSessionId.value = sessionId
+              tempSession.value = false
+            })
+
+            eventSource.onerror = (error) => {
+              console.error('SSE error:', error)
+              eventSource.close()
+              loading.value = false
             }
 
-            currentSessionId.value = sessionId
-            tempSession.value = false
-            // 断开引用并同步显示数组
-            currentMessages.value = [...sessions.value[sessionId].messages]
+            eventSource.onopen = () => {
+              // 连接建立后可以做一些处理
+            }
+
+            // 监听流结束事件（需要后端发送）
+            eventSource.addEventListener('end', () => {
+              eventSource.close()
+              loading.value = false
+              // 更新sessions中的消息
+              if (!tempSession.value) {
+                sessions.value[currentSessionId.value].messages = [...currentMessages.value]
+              }
+            })
           } else {
-            ElMessage.error(response.data.status_msg || '发送失败')
-            currentMessages.value.pop()
-          }
-        } else {
-          // 继续会话
-          const sessionMsgs = sessions.value[currentSessionId.value].messages
-          // 先 push user 到 session（只 push 一次）
-          sessionMsgs.push(userMessage)
+            // 继续会话流式
+            const sessionMsgs = sessions.value[currentSessionId.value].messages
+            sessionMsgs.push(userMessage)
 
-          const response = await api.post('/AI/chat/send', {
-            question: currentInput,
-            modelType: selectedModel.value,
-            sessionId: currentSessionId.value
-          })
-
-          if (response.data.status_code === 1000) {
+            const eventSource = new EventSource(`/api/AI/chat/stream-send?question=${encodeURIComponent(currentInput)}&modelType=${selectedModel.value}&sessionId=${currentSessionId.value}`)
+            let aiContent = ''
             const aiMessage = {
               role: 'assistant',
-              content: response.data.Information
+              content: ''
             }
             sessionMsgs.push(aiMessage)
-            // 同步 currentMessages（断开引用）
             currentMessages.value = [...sessionMsgs]
+
+            eventSource.onmessage = (event) => {
+              aiContent += event.data
+              aiMessage.content = aiContent
+            }
+
+            eventSource.onerror = (error) => {
+              console.error('SSE error:', error)
+              eventSource.close()
+              loading.value = false
+            }
+
+            eventSource.onopen = () => {
+              // 连接建立后可以做一些处理
+            }
+
+            // 监听流结束事件（需要后端发送）
+            eventSource.addEventListener('end', () => {
+              eventSource.close()
+              loading.value = false
+              // 更新sessions中的消息
+              sessions.value[currentSessionId.value].messages = [...currentMessages.value]
+            })
+          }
+        } else {
+          // 非流式响应（原有逻辑）
+          if (tempSession.value) {
+            // 新会话
+            const response = await api.post('/AI/chat/send-new-session', {
+              question: currentInput,
+              modelType: selectedModel.value
+            })
+
+            if (response.data.status_code === 1000) {
+              const sessionId = String(response.data.sessionId)
+              const aiMessage = {
+                role: 'assistant',
+                content: response.data.Information
+              }
+
+              sessions.value[sessionId] = {
+                id: sessionId,
+                name: '新会话',
+                messages: [userMessage, aiMessage]
+              }
+
+              currentSessionId.value = sessionId
+              tempSession.value = false
+              // 断开引用并同步显示数组
+              currentMessages.value = [...sessions.value[sessionId].messages]
+            } else {
+              ElMessage.error(response.data.status_msg || '发送失败')
+              currentMessages.value.pop()
+            }
           } else {
-            ElMessage.error(response.data.status_msg || '发送失败')
-            sessionMsgs.pop()
-            currentMessages.value.pop()
+            // 继续会话
+            const sessionMsgs = sessions.value[currentSessionId.value].messages
+            // 先 push user 到 session（只 push 一次）
+            sessionMsgs.push(userMessage)
+
+            const response = await api.post('/AI/chat/send', {
+              question: currentInput,
+              modelType: selectedModel.value,
+              sessionId: currentSessionId.value
+            })
+
+            if (response.data.status_code === 1000) {
+              const aiMessage = {
+                role: 'assistant',
+                content: response.data.Information
+              }
+              sessionMsgs.push(aiMessage)
+              // 同步 currentMessages（断开引用）
+              currentMessages.value = [...sessionMsgs]
+            } else {
+              ElMessage.error(response.data.status_msg || '发送失败')
+              sessionMsgs.pop()
+              currentMessages.value.pop()
+            }
           }
         }
       } catch (error) {
@@ -276,8 +369,11 @@ export default {
           sessions.value[currentSessionId.value].messages.pop()
         }
         currentMessages.value.pop()
-      } finally {
         loading.value = false
+      } finally {
+        if (!isStreaming.value) {
+          loading.value = false
+        }
         await nextTick()
         scrollToBottom()
       }
@@ -303,6 +399,7 @@ export default {
       messagesRef,
       messageInput,
       selectedModel,
+      isStreaming,
       renderMarkdown,
       playTTS,
       createNewSession,

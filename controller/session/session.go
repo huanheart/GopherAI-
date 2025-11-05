@@ -83,6 +83,33 @@ func CreateSessionAndSendMessage(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
+func CreateStreamSessionAndSendMessage(c *gin.Context) {
+	req := new(CreateSessionAndSendMessageRequest)
+	userName := c.GetString("userName") // From JWT middleware
+	if err := c.ShouldBindQuery(req); err != nil {
+		c.JSON(http.StatusOK, gin.H{"error": "Invalid parameters"})
+		return
+	}
+
+	// 设置SSE头
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("Access-Control-Allow-Origin", "*")
+
+	// 创建会话并开始流式发送
+	session_id, code_ := session.CreateStreamSessionAndSendMessage(userName, req.UserQuestion, req.ModelType, c.Writer)
+	if code_ != code.CodeSuccess {
+		c.SSEvent("error", gin.H{"message": "Failed to create session"})
+		return
+	}
+
+	// 发送会话ID
+	c.SSEvent("session", gin.H{"sessionId": session_id})
+	// 发送结束信号
+	c.SSEvent("end", gin.H{"message": "Stream ended"})
+}
+
 func ChatSend(c *gin.Context) {
 	req := new(ChatSendRequest)
 	res := new(ChatSendResponse)
@@ -102,6 +129,31 @@ func ChatSend(c *gin.Context) {
 	res.Success()
 	res.AiInformation = aiInformation
 	c.JSON(http.StatusOK, res)
+}
+
+func ChatStreamSend(c *gin.Context) {
+	req := new(ChatSendRequest)
+	userName := c.GetString("userName") // From JWT middleware
+	if err := c.ShouldBindQuery(req); err != nil {
+		c.JSON(http.StatusOK, gin.H{"error": "Invalid parameters"})
+		return
+	}
+
+	// 设置SSE头
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("Access-Control-Allow-Origin", "*")
+
+	// 开始流式发送
+	code_ := session.ChatStreamSend(userName, req.SessionID, req.UserQuestion, req.ModelType, c.Writer)
+	if code_ != code.CodeSuccess {
+		c.SSEvent("error", gin.H{"message": "Failed to send message"})
+		return
+	}
+
+	// 发送结束信号
+	c.SSEvent("end", gin.H{"message": "Stream ended"})
 }
 
 func ChatHistory(c *gin.Context) {
