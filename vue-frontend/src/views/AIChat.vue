@@ -158,7 +158,8 @@ export default {
         }
       }
 
-      currentMessages.value = sessions.value[sessionId].messages || []
+      // 断开引用，避免 currentMessages 与 sessions 共享同一数组，防止重复 push 导致重复渲染
+      currentMessages.value = [...(sessions.value[sessionId].messages || [])]
       await nextTick()
       scrollToBottom()
     }
@@ -180,7 +181,7 @@ export default {
             })
           })
           sessions.value[currentSessionId.value].messages = messages
-          currentMessages.value = messages
+          currentMessages.value = [...messages] // 同样断开引用
           await nextTick()
           scrollToBottom()
         } else {
@@ -202,9 +203,11 @@ export default {
         role: 'user',
         content: inputMessage.value
       }
-      currentMessages.value.push(userMessage)
       const currentInput = inputMessage.value
       inputMessage.value = ''
+
+      // 先把用户消息显示到当前视图（currentMessages），但不重复 push 到 sessions（参见下方逻辑）
+      currentMessages.value.push(userMessage)
 
       await nextTick()
       scrollToBottom()
@@ -234,14 +237,17 @@ export default {
 
             currentSessionId.value = sessionId
             tempSession.value = false
-            currentMessages.value = [userMessage, aiMessage]
+            // 断开引用并同步显示数组
+            currentMessages.value = [...sessions.value[sessionId].messages]
           } else {
             ElMessage.error(response.data.status_msg || '发送失败')
-            currentMessages.value.pop() // 移除用户消息
+            currentMessages.value.pop()
           }
         } else {
           // 继续会话
-          sessions.value[currentSessionId.value].messages.push(userMessage)
+          const sessionMsgs = sessions.value[currentSessionId.value].messages
+          // 先 push user 到 session（只 push 一次）
+          sessionMsgs.push(userMessage)
 
           const response = await api.post('/AI/chat/send', {
             question: currentInput,
@@ -254,11 +260,12 @@ export default {
               role: 'assistant',
               content: response.data.Information
             }
-            currentMessages.value.push(aiMessage)
-            sessions.value[currentSessionId.value].messages.push(aiMessage)
+            sessionMsgs.push(aiMessage)
+            // 同步 currentMessages（断开引用）
+            currentMessages.value = [...sessionMsgs]
           } else {
             ElMessage.error(response.data.status_msg || '发送失败')
-            sessions.value[currentSessionId.value].messages.pop() // 移除用户消息
+            sessionMsgs.pop()
             currentMessages.value.pop()
           }
         }
