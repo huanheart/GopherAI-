@@ -86,7 +86,7 @@ func CreateSessionAndSendMessage(c *gin.Context) {
 func CreateStreamSessionAndSendMessage(c *gin.Context) {
 	req := new(CreateSessionAndSendMessageRequest)
 	userName := c.GetString("userName") // From JWT middleware
-	if err := c.ShouldBindQuery(req); err != nil {
+	if err := c.ShouldBindJSON(req); err != nil {
 		c.JSON(http.StatusOK, gin.H{"error": "Invalid parameters"})
 		return
 	}
@@ -134,7 +134,7 @@ func ChatSend(c *gin.Context) {
 func ChatStreamSend(c *gin.Context) {
 	req := new(ChatSendRequest)
 	userName := c.GetString("userName") // From JWT middleware
-	if err := c.ShouldBindQuery(req); err != nil {
+	if err := c.ShouldBindJSON(req); err != nil {
 		c.JSON(http.StatusOK, gin.H{"error": "Invalid parameters"})
 		return
 	}
