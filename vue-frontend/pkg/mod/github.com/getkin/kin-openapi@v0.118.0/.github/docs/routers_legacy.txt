@@ -1,3 +1,0 @@
-func NewRouter(doc *openapi3.T, opts ...openapi3.ValidationOption) (routers.Router, error)
-type Router struct{ ... }
-type Routers []*Router

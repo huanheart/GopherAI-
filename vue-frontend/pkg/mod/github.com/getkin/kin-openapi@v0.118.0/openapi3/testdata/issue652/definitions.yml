@@ -1,4 +1,0 @@
-components:
-    schemas:
-        TestSchema:
-            type: string

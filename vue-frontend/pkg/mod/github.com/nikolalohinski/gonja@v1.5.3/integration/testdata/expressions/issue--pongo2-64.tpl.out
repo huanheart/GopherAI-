@@ -1,8 +1,0 @@
-https://github.com/flosch/pongo2/issues/64 (uint comparison with int const)
-8
-True
-False
-True
-True
-False
-False

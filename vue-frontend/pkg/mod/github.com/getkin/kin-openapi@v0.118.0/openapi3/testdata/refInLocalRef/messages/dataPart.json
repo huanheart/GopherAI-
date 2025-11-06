@@ -1,9 +1,0 @@
-{
-  "type": "object",
-  "properties": {
-    "idPart": {
-      "type": "integer",
-      "format": "int64"
-    }
-  }
-}
