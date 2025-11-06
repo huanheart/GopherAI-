@@ -67,8 +67,9 @@ func CreateSessionAndSendMessage(userName string, userQuestion string, modelType
 	return createdSession.ID, aiResponse.Content, code.CodeSuccess
 }
 
-func CreateStreamSessionAndSendMessage(userName string, userQuestion string, modelType string, writer gin.ResponseWriter) (string, code.Code) {
-	//1：创建一个新的会话
+// --- MODIFICATION START ---
+// This function ONLY creates a session database record.
+func CreateStreamSessionOnly(userName string, userQuestion string) (string, code.Code) {
 	newSession := &model.Session{
 		ID:       uuid.New().String(),
 		UserName: userName,
@@ -76,22 +77,25 @@ func CreateStreamSessionAndSendMessage(userName string, userQuestion string, mod
 	}
 	createdSession, err := session.CreateSession(newSession)
 	if err != nil {
-		log.Println("CreateStreamSessionAndSendMessage CreateSession error:", err)
+		log.Println("CreateStreamSessionOnly CreateSession error:", err)
 		return "", code.CodeServerBusy
 	}
+	return createdSession.ID, code.CodeSuccess
+}
 
-	//2：获取AIHelper并通过其管理消息
+// This function streams a message to an already existing session.
+// It's basically the old ChatStreamSend, but we'll rename ChatStreamSend to this to be clearer.
+func StreamMessageToExistingSession(userName string, sessionID string, userQuestion string, modelType string, writer gin.ResponseWriter) code.Code {
 	manager := aihelper.GetGlobalManager()
 	config := map[string]interface{}{
 		"apiKey": "your-api-key", // TODO: 从配置中获取
 	}
-	helper, err := manager.GetOrCreateAIHelper(userName, createdSession.ID, modelType, config)
+	helper, err := manager.GetOrCreateAIHelper(userName, sessionID, modelType, config)
 	if err != nil {
-		log.Println("CreateStreamSessionAndSendMessage GetOrCreateAIHelper error:", err)
-		return "", code.AIModelFail
+		log.Println("StreamMessageToExistingSession GetOrCreateAIHelper error:", err)
+		return code.AIModelFail
 	}
 
-	//3：生成流式AI回复
 	cb := func(msg string) {
 		writer.WriteString("data: " + msg + "\n\n")
 		writer.(http.Flusher).Flush()
@@ -99,12 +103,36 @@ func CreateStreamSessionAndSendMessage(userName string, userQuestion string, mod
 
 	_, err_ := helper.StreamResponse(userName, ctx, cb, userQuestion)
 	if err_ != nil {
-		log.Println("CreateStreamSessionAndSendMessage StreamResponse error:", err_)
-		return "", code.AIModelFail
+		log.Println("StreamMessageToExistingSession StreamResponse error:", err_)
+		return code.AIModelFail
 	}
 
-	return createdSession.ID, code.CodeSuccess
+	// After the stream is finished, send the final DONE signal.
+	writer.WriteString("data: [DONE]\n\n")
+	writer.(http.Flusher).Flush()
+
+	return code.CodeSuccess
 }
+
+// The old function now uses the new building blocks. It is kept for logical separation.
+func CreateStreamSessionAndSendMessage(userName string, userQuestion string, modelType string, writer gin.ResponseWriter) (string, code.Code) {
+	// Step 1: Create the session record.
+	sessionID, code_ := CreateStreamSessionOnly(userName, userQuestion)
+	if code_ != code.CodeSuccess {
+		return "", code_
+	}
+
+	// Step 2: Stream the message to the newly created session.
+	code_ = StreamMessageToExistingSession(userName, sessionID, userQuestion, modelType, writer)
+	if code_ != code.CodeSuccess {
+		// Even if streaming fails, we return the session ID so the client knows about it.
+		return sessionID, code_
+	}
+
+	return sessionID, code.CodeSuccess
+}
+
+// --- MODIFICATION END ---
 
 func ChatSend(userName string, sessionID string, userQuestion string, modelType string) (string, code.Code) {
 	//1：获取AIHelper
@@ -152,27 +180,6 @@ func GetChatHistory(userName string, sessionID string) ([]model.History, code.Co
 }
 
 func ChatStreamSend(userName string, sessionID string, userQuestion string, modelType string, writer gin.ResponseWriter) code.Code {
-	//1：获取AIHelper
-	manager := aihelper.GetGlobalManager()
-	config := map[string]interface{}{
-		"apiKey": "your-api-key", // TODO: 从配置中获取
-	}
-	helper, err := manager.GetOrCreateAIHelper(userName, sessionID, modelType, config)
-	if err != nil {
-		log.Println("ChatStreamSend GetOrCreateAIHelper error:", err)
-		return code.AIModelFail
-	}
-
-	//2：生成流式AI回复
-	cb := func(msg string) {
-		writer.WriteString("data: " + msg + "\n\n")
-		writer.(http.Flusher).Flush()
-	}
-	_, err_ := helper.StreamResponse(userName, ctx, cb, userQuestion)
-	if err_ != nil {
-		log.Println("ChatStreamSend StreamResponse error:", err_)
-		return code.AIModelFail
-	}
-
-	return code.CodeSuccess
+	// This function now just calls the new, more descriptive function.
+	return StreamMessageToExistingSession(userName, sessionID, userQuestion, modelType, writer)
 }

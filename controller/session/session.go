@@ -97,17 +97,17 @@ func CreateStreamSessionAndSendMessage(c *gin.Context) {
 	c.Header("Connection", "keep-alive")
 	c.Header("Access-Control-Allow-Origin", "*")
 
-	// 创建会话并开始流式发送
+	// --- Rollback to simple version ---
 	session_id, code_ := session.CreateStreamSessionAndSendMessage(userName, req.UserQuestion, req.ModelType, c.Writer)
 	if code_ != code.CodeSuccess {
 		c.SSEvent("error", gin.H{"message": "Failed to create session"})
 		return
 	}
 
-	// 发送会话ID
+	// Send the session ID
 	c.SSEvent("session", gin.H{"sessionId": session_id})
-	// 发送结束信号
-	c.SSEvent("end", gin.H{"message": "Stream ended"})
+	// The service layer will handle the rest of the stream, including the [DONE] signal.
+	// The controller returns immediately, which is the correct behavior for SSE with Gin.
 }
 
 func ChatSend(c *gin.Context) {
@@ -145,15 +145,13 @@ func ChatStreamSend(c *gin.Context) {
 	c.Header("Connection", "keep-alive")
 	c.Header("Access-Control-Allow-Origin", "*")
 
-	// 开始流式发送
+	// --- Rollback to simple version ---
 	code_ := session.ChatStreamSend(userName, req.SessionID, req.UserQuestion, req.ModelType, c.Writer)
 	if code_ != code.CodeSuccess {
 		c.SSEvent("error", gin.H{"message": "Failed to send message"})
 		return
 	}
-
-	// 发送结束信号
-	c.SSEvent("end", gin.H{"message": "Stream ended"})
+	// The service layer handles the stream. The controller's job is done.
 }
 
 func ChatHistory(c *gin.Context) {

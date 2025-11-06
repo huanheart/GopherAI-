@@ -105,56 +105,8 @@ export default {
     const selectedModel = ref('1')
     const isStreaming = ref(false)
 
-    // === smooth render helpers ===
-    // We'll keep per-ai-message render buffers so multiple concurrent streams (theoretically) won't collide.
-    // Map from aiMessageId (we'll use index or generated id) -> { buffer: string, timer: number|null }
-    const _renderBuffers = new Map()
-
-    function _startSmoothTimer(id, aiMessage, speedMs = 30, chunkSize = 2) {
-      // if timer exists, do nothing
-      const entry = _renderBuffers.get(id)
-      if (!entry) return
-      if (entry.timer) return
-
-      entry.timer = setInterval(async () => {
-        if (!entry.buffer || entry.buffer.length === 0) {
-          // no buffer, stop timer
-          clearInterval(entry.timer)
-          entry.timer = null
-          // if stream finished and no buffer, ensure final flush (nothing to flush)
-          return
-        }
-        // Take small chunk and append
-        const chunk = entry.buffer.slice(0, chunkSize)
-        entry.buffer = entry.buffer.slice(chunk.length)
-        // mutate aiMessage content safely
-        aiMessage.content += chunk
-        // After adding chunk, scroll to bottom
-        await nextTick()
-        scrollToBottom()
-      }, speedMs)
-    }
-
-    function _appendToBuffer(id, text, aiMessage, speedMs = 30, chunkSize = 2) {
-      let entry = _renderBuffers.get(id)
-      if (!entry) {
-        entry = { buffer: '', timer: null }
-        _renderBuffers.set(id, entry)
-      }
-      entry.buffer += text
-      // start timer if not running
-      _startSmoothTimer(id, aiMessage, speedMs, chunkSize)
-    }
-
-    function _clearBuffer(id) {
-      const entry = _renderBuffers.get(id)
-      if (!entry) return
-      if (entry.timer) {
-        clearInterval(entry.timer)
-        entry.timer = null
-      }
-      _renderBuffers.delete(id)
-    }
+    // --- Rollback to stable direct-append version ---
+    // Typewriter effect has been removed to ensure stability.
 
     // === utility functions ===
     const renderMarkdown = (text) => {
@@ -318,8 +270,6 @@ export default {
         content: '',
         meta: { status: 'streaming' } // mark streaming
       }
-      // We'll use an id for buffer map; use timestamp + random
-      const aiId = `ai-${Date.now()}-${Math.floor(Math.random() * 10000)}`
 
       // push placeholder into currentMessages (view)
       currentMessages.value.push(aiMessage)
@@ -362,7 +312,7 @@ export default {
       // we'll update the aiMessage.content via smooth append to avoid flash
 
       // initialize buffer entry for this aiId
-      _renderBuffers.set(aiId, { buffer: '', timer: null })
+      // No longer using render buffers.
 
       async function processChunk(chunkText) {
         // chunkText may include several SSE lines or partial
@@ -386,30 +336,36 @@ export default {
               return { doneSignal: true }
             }
           } else if (line.startsWith('data:')) {
-            const data = line.slice(5).trim()
-            // try to parse as JSON first
-            try {
-              const parsed = JSON.parse(data)
-              if (parsed.sessionId) {
-                // this is session event data
-                const newSid = String(parsed.sessionId)
-                if (tempSession.value) {
-                  sessions.value[newSid] = {
-                    id: newSid,
-                    name: sessions.value[newSid]?.name || '新会话',
-                    messages: [...currentMessages.value]
+            const data = line.slice(5).trim();
+
+            // --- Rollback to stable direct-append version ---
+            if (data.startsWith('{')) {
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.sessionId) {
+                  const newSid = String(parsed.sessionId);
+                  if (tempSession.value) {
+                    sessions.value[newSid] = {
+                      id: newSid,
+                      name: '新会话',
+                      messages: [...currentMessages.value]
+                    };
+                    currentSessionId.value = newSid;
+                    tempSession.value = false;
                   }
-                  currentSessionId.value = newSid
-                  tempSession.value = false
                 }
-              } else if (parsed.message && parsed.message === 'Stream ended') {
-                // end event
-                aiMessage.meta = { status: 'done' }
-                return { doneSignal: true }
+              } catch (e) {
+                // Not a valid JSON, maybe a text message that starts with '{'. Append it.
+                aiMessage.content += data;
               }
-            } catch (e) {
-              // not JSON, treat as plain text response
-              _appendToBuffer(aiId, data, aiMessage)
+            } else if (data === '[DONE]') {
+              // This is the explicit end signal.
+              aiMessage.meta = { status: 'done' };
+              return { doneSignal: true };
+            } else {
+              // This is a plain text chunk. Append it directly.
+              aiMessage.content += data;
+              nextTick(scrollToBottom); // Scroll as content arrives
             }
           }
         }
@@ -451,19 +407,37 @@ export default {
                 }
               }
               // cleanup buffer entry
-              _clearBuffer(aiId)
+              // _clearBuffer(aiId) // Removed
             }, 350)
             break
           } else {
-            const chunkText = decoder.decode(value, { stream: true })
-            await processChunk(chunkText)
+            const chunkText = decoder.decode(value, { stream: true });
+            const { doneSignal } = await processChunk(chunkText);
+            if (doneSignal) {
+              // The server has sent the [DONE] signal. We can stop reading.
+              loading.value = false;
+              // Finalize and clean up, similar to the 'done' block below.
+              setTimeout(() => {
+                aiMessage.meta = { status: 'done' };
+                if (!tempSession.value && currentSessionId.value && sessions.value[currentSessionId.value]) {
+         const sessMsgs = sessions.value[currentSessionId.value].messages;
+         if (Array.isArray(sessMsgs) && sessMsgs.length) {
+          let lastAsst = sessMsgs[sessMsgs.length - 1]
+          if (lastAsst.role === "assistant") {
+           lastAsst.content = aiMessage.content
+          }
+         }
+                }
+              }, 350);
+              break; // Exit the while (true) loop
+            }
           }
         }
       } catch (err) {
         console.error('Stream reading error:', err)
         loading.value = false
         aiMessage.meta = { status: 'error' }
-        _clearBuffer(aiId)
+        // _clearBuffer(aiId) // Removed
       } finally {
         // ensure we set loading false for streaming case
         loading.value = false
