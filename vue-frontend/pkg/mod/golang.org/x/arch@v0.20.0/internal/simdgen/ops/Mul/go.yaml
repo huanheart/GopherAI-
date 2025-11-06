@@ -1,0 +1,66 @@
+!sum
+# "Normal" multiplication is only available for floats.
+# This only covers the single and double precision.
+- go: Mul
+  asm: "VMULP[SD]"
+  in:
+  - &fp
+    go: $t
+    base: float
+  - *fp
+  out:
+  - *fp
+
+# Integer multiplications.
+
+# MulEvenWiden
+# Dword only.
+- go: MulEvenWiden
+  asm: "VPMULDQ"
+  in:
+  - &int
+    go: $t
+    base: int
+  - *int
+  out:
+  - &int2
+    go: $t2
+    base: int
+- go: MulEvenWiden
+  asm: "VPMULUDQ"
+  in:
+  - &uint
+    go: $t
+    base: uint
+  - *uint
+  out:
+  - &uint2
+    go: $t2
+    base: uint
+
+# MulHigh
+# Word only.
+- go: MulHigh
+  asm: "VPMULHW"
+  in:
+  - *int
+  - *int
+  out:
+  - *int2
+- go: MulHigh
+  asm: "VPMULHUW"
+  in:
+  - *uint
+  - *uint
+  out:
+  - *uint2
+
+# MulLow
+# Signed int only.
+- go: Mul
+  asm: "VPMULL[WDQ]"
+  in:
+  - *int
+  - *int
+  out:
+  - *int2

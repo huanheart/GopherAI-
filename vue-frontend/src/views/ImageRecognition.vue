@@ -50,59 +50,61 @@ export default {
       if (!selectedFile.value) return
 
       const file = selectedFile.value
-      const reader = new FileReader()
+      const imageUrl = URL.createObjectURL(file)
 
-      reader.onload = async function(event) {
-        const base64Url = event.target.result
-        const base64Data = base64Url.split(',')[1]
+      // Add user message to UI
+      messages.value.push({
+        role: 'user',
+        content: `已上传图片: ${file.name}`,
+        imageUrl: imageUrl,
+      })
 
-        // 添加用户消息
-        messages.value.push({
-          role: 'user',
-          content: `已上传图片: ${file.name}`,
-          imageUrl: base64Url
+      await nextTick()
+      scrollToBottom()
+
+      // Create FormData
+      const formData = new FormData()
+      formData.append('image', file)
+
+      try {
+        const response = await api.post('/image/recognize', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
         })
 
-        await nextTick()
-        scrollToBottom()
-
-        try {
-          const response = await api.post('/upload/send', {
-            filename: file.name,
-            image: base64Data
-          })
-
-          if (response.data.status_code === 1000) {
-            const aiText = `识别结果: ${response.data.class_name} (置信度: ${Math.round(response.data.confidence * 100)}%)`
+          // Check for a specific success field, or just status_code
+        if (response.data && response.data.class_name) {
+             const aiText = `识别结果: ${response.data.class_name}`
             messages.value.push({
-              role: 'assistant',
-              content: aiText
+                role: 'assistant',
+                content: aiText,
             })
-          } else {
-            messages.value.push({
-              role: 'assistant',
-              content: `[错误] ${response.data.status_msg || '识别失败'}`
-            })
-          }
-        } catch (error) {
-          console.error('Upload error:', error)
-          messages.value.push({
-            role: 'assistant',
-            content: `[错误] 无法连接到服务器或上传失败: ${error.message}`
-          })
+        } else {
+             messages.value.push({
+                 role: 'assistant',
+                 content: `[错误] ${response.data.status_msg || '识别失败'}`,
+             })
         }
+      } catch (error) {
+        console.error('Upload error:', error)
+        messages.value.push({
+          role: 'assistant',
+          content: `[错误] 无法连接到服务器或上传失败: ${error.message}`,
+        })
+      } finally {
+            // Revoke the object URL to free up memory
+        URL.revokeObjectURL(imageUrl)
 
-        await nextTick()
+            await nextTick()
         scrollToBottom()
 
-        // 清空文件输入
+            // Clear the file input
         selectedFile.value = null
         if (fileInputRef.value) {
           fileInputRef.value.value = ''
         }
       }
-
-      reader.readAsDataURL(file)
     }
 
     const scrollToBottom = () => {

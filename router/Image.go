@@ -1,13 +1,14 @@
 package router
 
-import "github.com/gin-gonic/gin"
+import (
+	"GopherAI/controller/image"
 
-func ImageRouter(r *gin.RouterGroup) {
+	"github.com/gin-gonic/gin"
+)
 
-	// {
-	// 	// 上传接口
-	// 	r.GET("/upload", image.AIUpload)           // AIUploadHandler
-	// 	r.POST("/upload/send", image.AIUploadSend) // AIUploadSendHandler
-	// }
-
+func ImageRouter(r *gin.Engine) {
+	imageRouter := r.Group("/image")
+	{
+		imageRouter.POST("/recognize", image.RecognizeImageHandler)
+	}
 }
