@@ -532,7 +532,7 @@ export default {
 
 <style scoped>
 .ai-chat-container {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   position: relative;
@@ -560,6 +560,8 @@ export default {
 
 .session-list {
   width: 280px;
+  height: 100vh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background: rgba(255, 255, 255, 0.95);
@@ -655,6 +657,8 @@ export default {
   position: relative;
   z-index: 1;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .top-bar {
@@ -720,6 +724,7 @@ export default {
 
 .chat-messages {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 30px;
   display: flex;
