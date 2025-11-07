@@ -5,6 +5,7 @@ import (
 	"GopherAI/controller"
 	"GopherAI/model"
 	"GopherAI/service/session"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -97,17 +98,23 @@ func CreateStreamSessionAndSendMessage(c *gin.Context) {
 	c.Header("Connection", "keep-alive")
 	c.Header("Access-Control-Allow-Origin", "*")
 
-	// --- Rollback to simple version ---
-	session_id, code_ := session.CreateStreamSessionAndSendMessage(userName, req.UserQuestion, req.ModelType, c.Writer)
+	// 先创建会话并立即把 sessionId 下发给前端，随后再开始流式输出
+	sessionID, code_ := session.CreateStreamSessionOnly(userName, req.UserQuestion)
 	if code_ != code.CodeSuccess {
 		c.SSEvent("error", gin.H{"message": "Failed to create session"})
 		return
 	}
 
-	// Send the session ID
-	c.SSEvent("session", gin.H{"sessionId": session_id})
-	// The service layer will handle the rest of the stream, including the [DONE] signal.
-	// The controller returns immediately, which is the correct behavior for SSE with Gin.
+	// 先把 sessionId 通过 data 事件发送给前端，前端据此绑定当前会话，侧边栏即可出现新标签
+	c.Writer.WriteString(fmt.Sprintf("data: {\"sessionId\": \"%s\"}\n\n", sessionID))
+	c.Writer.Flush()
+
+	// 然后开始把本次回答进行流式发送（包含最后的 [DONE]）
+	code_ = session.StreamMessageToExistingSession(userName, sessionID, req.UserQuestion, req.ModelType, c.Writer)
+	if code_ != code.CodeSuccess {
+		c.SSEvent("error", gin.H{"message": "Failed to send message"})
+		return
+	}
 }
 
 func ChatSend(c *gin.Context) {

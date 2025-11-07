@@ -417,13 +417,13 @@ export default {
               setTimeout(() => {
                 aiMessage.meta = { status: 'done' };
                 if (!tempSession.value && currentSessionId.value && sessions.value[currentSessionId.value]) {
-         const sessMsgs = sessions.value[currentSessionId.value].messages;
-         if (Array.isArray(sessMsgs) && sessMsgs.length) {
-          let lastAsst = sessMsgs[sessMsgs.length - 1]
-          if (lastAsst.role === "assistant") {
-           lastAsst.content = aiMessage.content
-          }
-         }
+                  const sessMsgs = sessions.value[currentSessionId.value].messages;
+                  if (Array.isArray(sessMsgs) && sessMsgs.length) {
+                    let lastAsst = sessMsgs[sessMsgs.length - 1]
+                    if (lastAsst.role === "assistant") {
+                      lastAsst.content = aiMessage.content
+                    }
+                  }
                 }
               }, 350);
               break; // Exit the while (true) loop
