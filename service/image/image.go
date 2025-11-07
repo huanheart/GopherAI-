@@ -3,6 +3,7 @@ package image
 import (
 	"GopherAI/common/image"
 	"io"
+	"log"
 	"mime/multipart"
 )
 
@@ -16,18 +17,21 @@ func RecognizeImage(file *multipart.FileHeader) (string, error) {
 	// Create a new recognizer for this specific request, using the updated function signature
 	recognizer, err := image.NewImageRecognizer(modelPath, labelPath, inputH, inputW)
 	if err != nil {
+		log.Println("NewImageRecognizer fail err is : ", err)
 		return "", err
 	}
 	defer recognizer.Close() // Ensure resources are released
 
 	src, err := file.Open()
 	if err != nil {
+		log.Println("file open fail err is : ", err)
 		return "", err
 	}
 	defer src.Close()
 
 	buf, err := io.ReadAll(src)
 	if err != nil {
+		log.Println("io.ReadAll fail err is : ", err)
 		return "", err
 	}
 

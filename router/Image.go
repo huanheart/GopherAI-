@@ -6,9 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func ImageRouter(r *gin.Engine) {
-	imageRouter := r.Group("/image")
-	{
-		imageRouter.POST("/recognize", image.RecognizeImageHandler)
-	}
+func ImageRouter(r *gin.RouterGroup) {
+
+	r.POST("/recognize", image.RecognizeImage)
 }

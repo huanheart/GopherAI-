@@ -2,14 +2,18 @@ package image
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"os"
 	"path/filepath"
 
 	ort "github.com/yalue/onnxruntime_go"
-	"gocv.io/x/gocv"
+	"golang.org/x/image/draw"
 )
 
 type ImageRecognizer struct {
@@ -24,8 +28,8 @@ type ImageRecognizer struct {
 }
 
 const (
-	defaultInputName  = "input"
-	defaultOutputName = "output"
+	defaultInputName  = "data"
+	defaultOutputName = "mobilenetv20_output_flatten0_reshape0"
 )
 
 // NewImageRecognizer 创建识别器（自动使用默认 input/output 名称）
@@ -35,7 +39,8 @@ func NewImageRecognizer(modelPath, labelPath string, inputH, inputW int) (*Image
 	}
 
 	// 初始化 ONNX 环境（全局一次）
-	if err := ort.InitializeEnvironment(); err != nil {
+	err := ort.InitializeEnvironment()
+	if err != nil {
 		return nil, fmt.Errorf("onnxruntime initialize error: %w", err)
 	}
 
@@ -105,51 +110,55 @@ func (r *ImageRecognizer) Close() {
 }
 
 func (r *ImageRecognizer) PredictFromFile(imagePath string) (string, error) {
-	if _, err := os.Stat(imagePath); err != nil {
+	file, err := os.Open(filepath.Clean(imagePath))
+	if err != nil {
 		return "", fmt.Errorf("image not found: %w", err)
 	}
-	img := gocv.IMRead(imagePath, gocv.IMReadColor)
-	if img.Empty() {
-		return "", fmt.Errorf("failed to read image: %s", imagePath)
+	defer file.Close()
+
+	img, _, err := image.Decode(file)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode image: %w", err)
 	}
-	defer img.Close()
-	return r.PredictFromMat(img)
+
+	return r.PredictFromImage(img)
 }
 
 func (r *ImageRecognizer) PredictFromBuffer(buf []byte) (string, error) {
-	mat, err := gocv.IMDecode(buf, gocv.IMReadColor)
+	img, _, err := image.Decode(bytes.NewReader(buf))
 	if err != nil {
-		return "", fmt.Errorf("imdecode failed: %w", err)
+		return "", fmt.Errorf("failed to decode image from buffer: %w", err)
 	}
-	defer mat.Close()
-	if mat.Empty() {
-		return "", errors.New("decoded image is empty")
-	}
-	return r.PredictFromMat(mat)
+	return r.PredictFromImage(img)
 }
 
-func (r *ImageRecognizer) PredictFromMat(img gocv.Mat) (string, error) {
-	if img.Empty() {
-		return "", errors.New("input image is empty")
-	}
+// PredictFromImage is the core prediction function that takes a Go `image.Image`
+func (r *ImageRecognizer) PredictFromImage(img image.Image) (string, error) {
+	// Create a new RGBA image to draw the resized image on.
+	resizedImg := image.NewRGBA(image.Rect(0, 0, r.inputW, r.inputH))
 
-	dst := gocv.NewMat()
-	defer dst.Close()
-	gocv.Resize(img, &dst, image.Pt(r.inputW, r.inputH), 0, 0, gocv.InterpolationDefault)
+	// Resize the image using a high-quality rescaler.
+	draw.CatmullRom.Scale(resizedImg, resizedImg.Bounds(), img, img.Bounds(), draw.Over, nil)
 
-	h, w, ch := r.inputH, r.inputW, 3
+	h, w := r.inputH, r.inputW
+	ch := 3 // R, G, B
 	data := make([]float32, h*w*ch)
 
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
-			v := dst.GetVecbAt(y, x)
-			rv := float32(v[2]) / 255.0
-			gv := float32(v[1]) / 255.0
-			bv := float32(v[0]) / 255.0
+			c := resizedImg.At(x, y)
+			// image.At() returns color.Color, we need to get the r,g,b,a values
+			r, g, b, _ := c.RGBA()
 
-			data[y*w+x] = rv
-			data[h*w+y*w+x] = gv
-			data[2*h*w+y*w+x] = bv
+			// The returned values are in the range [0, 65535]. We need to convert them to [0, 255] and then to float32 [0.0, 1.0]
+			rf := float32(r>>8) / 255.0
+			gf := float32(g>>8) / 255.0
+			bf := float32(b>>8) / 255.0
+
+			// NCHW format
+			data[y*w+x] = rf
+			data[h*w+y*w+x] = gf
+			data[2*h*w+y*w+x] = bf
 		}
 	}
 
