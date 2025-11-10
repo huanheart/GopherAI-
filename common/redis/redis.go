@@ -3,7 +3,6 @@ package redis
 import (
 	"GopherAI/config"
 	"context"
-	"log"
 	"strconv"
 	"strings"
 	"time"
