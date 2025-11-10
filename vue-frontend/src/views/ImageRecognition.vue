@@ -1,32 +1,53 @@
 <template>
   <div class="image-recognition-container">
-    <div class="top-bar">
-      <button class="back-btn" @click="$router.push('/menu')">← 返回</button>
-      <h2>AI 图像识别助手</h2>
+    <!-- 左侧会话列表 -->
+    <div class="session-list">
+      <div class="session-list-header">
+        <span>图像识别</span>
+      </div>
+      <ul class="session-list-ul">
+        <li class="session-item active">
+          图像识别助手
+        </li>
+      </ul>
     </div>
 
-    <div class="chat-container" ref="chatContainerRef">
-      <div
-        v-for="(message, index) in messages"
-        :key="index"
-        :class="['message', message.role === 'user' ? 'user' : 'assistant']"
-      >
-        <b>{{ message.role === 'user' ? '你' : 'AI' }}:</b>
-        <span>{{ message.content }}</span>
-        <img v-if="message.imageUrl" :src="message.imageUrl" alt="上传的图片" />
+    <!-- 右侧聊天区域 -->
+    <div class="chat-section">
+      <div class="top-bar">
+        <button class="back-btn" @click="$router.push('/menu')">← 返回</button>
+        <h2>AI 图像识别助手</h2>
+      </div>
+
+      <div class="chat-messages" ref="chatContainerRef">
+        <div
+          v-for="(message, index) in messages"
+          :key="index"
+          :class="['message', message.role === 'user' ? 'user-message' : 'ai-message']"
+        >
+          <div class="message-header">
+            <b>{{ message.role === 'user' ? '你' : 'AI' }}:</b>
+          </div>
+          <div class="message-content">
+            <span>{{ message.content }}</span>
+            <img v-if="message.imageUrl" :src="message.imageUrl" alt="上传的图片" />
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-input">
+        <form @submit.prevent="handleSubmit">
+          <input
+            ref="fileInputRef"
+            type="file"
+            accept="image/*"
+            required
+            @change="handleFileSelect"
+          />
+          <button type="submit" :disabled="!selectedFile">发送图片</button>
+        </form>
       </div>
     </div>
-
-    <form class="input-box" @submit.prevent="handleSubmit">
-      <input
-        ref="fileInputRef"
-        type="file"
-        accept="image/*"
-        required
-        @change="handleFileSelect"
-      />
-      <button type="submit" :disabled="!selectedFile">发送图片</button>
-    </form>
   </div>
 </template>
 
@@ -127,12 +148,13 @@ export default {
 
 <style scoped>
 .image-recognition-container {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
-  flex-direction: column;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   position: relative;
   overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  color: #222;
 }
 
 .image-recognition-container::before {
@@ -142,8 +164,9 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="20" cy="20" r="2" fill="rgba(255,255,255,0.1)"/><circle cx="80" cy="80" r="2" fill="rgba(255,255,255,0.1)"/><circle cx="40" cy="60" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="60" cy="30" r="1.5" fill="rgba(255,255,255,0.1)"/></svg>');
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="20" cy="20" r="2" fill="rgba(255,255,255,0.08)"/><circle cx="80" cy="80" r="2" fill="rgba(255,255,255,0.08)"/><circle cx="40" cy="60" r="1" fill="rgba(255,255,255,0.06)"/><circle cx="60" cy="30" r="1.5" fill="rgba(255,255,255,0.06)"/></svg>');
   animation: float 20s ease-in-out infinite;
+  opacity: 0.25;
 }
 
 @keyframes float {
@@ -151,91 +174,140 @@ export default {
   50% { transform: translateY(-20px) rotate(180deg); }
 }
 
-.top-bar {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  color: white;
+.session-list {
+  width: 280px;
+  height: 100vh;
+  overflow: hidden;
   display: flex;
-  align-items: center;
-  padding: 0 30px;
-  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(15px);
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.08);
   position: relative;
   z-index: 2;
 }
 
-.back-btn {
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+.session-list-header {
+  padding: 20px;
+  text-align: center;
+  font-weight: 600;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.06) 0%, rgba(103, 194, 58, 0.06) 100%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.session-list-ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.session-item {
+  padding: 15px 20px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+  position: relative;
+  color: #2c3e50;
+}
+
+.session-item.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  padding: 10px 20px;
-  border-radius: 12px;
+  font-weight: 600;
+  box-shadow: inset 0 0 20px rgba(102, 126, 234, 0.2);
+}
+
+/* chat section */
+.chat-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.top-bar {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  color: #2c3e50;
+  display: flex;
+  align-items: center;
+  padding: 12px 24px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  gap: 12px;
+}
+
+.back-btn {
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  color: #2c3e50;
+  padding: 8px 14px;
+  border-radius: 10px;
   cursor: pointer;
   font-weight: 600;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 .back-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.32);
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
 }
 
 .top-bar h2 {
-  margin: 0 0 0 20px;
+  margin: 0;
   font-size: 24px;
   font-weight: 600;
-  background: linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.8) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
-.chat-container {
+.chat-messages {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 30px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
   position: relative;
   z-index: 1;
 }
 
-.chat-container::-webkit-scrollbar {
-  width: 6px;
+/* scrollbar */
+.chat-messages::-webkit-scrollbar {
+  width: 8px;
 }
-
-.chat-container::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+.chat-messages::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.12);
+  border-radius: 8px;
 }
-
-.chat-container::-webkit-scrollbar-thumb {
-  background: rgba(102, 126, 234, 0.3);
-  border-radius: 3px;
-}
-
-.chat-container::-webkit-scrollbar-thumb:hover {
-  background: rgba(102, 126, 234, 0.5);
+.chat-messages::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .message {
   max-width: 70%;
-  padding: 16px 20px;
-  border-radius: 20px;
+  padding: 14px 18px;
+  border-radius: 18px;
   line-height: 1.6;
   word-wrap: break-word;
   position: relative;
-  animation: messageSlideIn 0.4s ease-out;
+  animation: messageSlideIn 0.28s ease-out;
   font-size: 15px;
+  box-sizing: border-box;
 }
 
 @keyframes messageSlideIn {
   from {
     opacity: 0;
-    transform: translateY(20px) scale(0.95);
+    transform: translateY(12px) scale(0.98);
   }
   to {
     opacity: 1;
@@ -243,19 +315,18 @@ export default {
   }
 }
 
-.user {
+.user-message {
+  align-self: flex-end;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  align-self: flex-end;
-  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
-  position: relative;
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.16);
 }
 
-.user::after {
+.user-message::after {
   content: '';
   position: absolute;
-  bottom: -2px;
-  right: 20px;
+  bottom: -6px;
+  right: 18px;
   width: 0;
   height: 0;
   border-left: 8px solid transparent;
@@ -263,21 +334,20 @@ export default {
   border-top: 8px solid #764ba2;
 }
 
-.assistant {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  color: #2c3e50;
+.ai-message {
   align-self: flex-start;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  position: relative;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(4px);
+  color: #2c3e50;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-.assistant::after {
+.ai-message::after {
   content: '';
   position: absolute;
-  bottom: -2px;
-  left: 20px;
+  bottom: -6px;
+  left: 18px;
   width: 0;
   height: 0;
   border-left: 8px solid transparent;
@@ -285,12 +355,24 @@ export default {
   border-top: 8px solid rgba(255, 255, 255, 0.95);
 }
 
-.message b {
-  font-weight: 600;
-  margin-right: 8px;
+.message-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
 }
 
-.message img {
+.message-header b {
+  font-weight: 600;
+}
+
+/* message content */
+.message-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.message-content img {
   max-width: 250px;
   border-radius: 12px;
   display: block;
@@ -299,22 +381,26 @@ export default {
   transition: all 0.3s ease;
 }
 
-.message img:hover {
+.message-content img:hover {
   transform: scale(1.05);
 }
 
-.input-box {
-  display: flex;
-  padding: 30px;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
-  gap: 20px;
+/* input area */
+.chat-input {
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
   position: relative;
   z-index: 1;
 }
 
-.input-box input[type="file"] {
+.chat-input form {
+  display: flex;
+  gap: 20px;
+}
+
+.chat-input input[type="file"] {
   flex: 1;
   border: 2px dashed #d9d9d9;
   border-radius: 12px;
@@ -326,12 +412,12 @@ export default {
   font-size: 14px;
 }
 
-.input-box input[type="file"]:hover {
+.chat-input input[type="file"]:hover {
   border-color: #409eff;
   background: rgba(64, 158, 255, 0.05);
 }
 
-.input-box input[type="file"]::file-selector-button {
+.chat-input input[type="file"]::file-selector-button {
   border: none;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 8px 16px;
@@ -344,12 +430,12 @@ export default {
   box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
 }
 
-.input-box input[type="file"]::file-selector-button:hover {
+.chat-input input[type="file"]::file-selector-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
 }
 
-.input-box button {
+.chat-input button {
   padding: 15px 30px;
   border: none;
   border-radius: 12px;
@@ -362,12 +448,12 @@ export default {
   box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
 }
 
-.input-box button:hover {
+.chat-input button:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
 }
 
-.input-box button:disabled {
+.chat-input button:disabled {
   background: #ccc;
   box-shadow: none;
   cursor: not-allowed;

@@ -70,6 +70,7 @@ func (o *OpenAIModel) StreamResponse(ctx context.Context, messages []*schema.Mes
 		}
 		if len(msg.Content) > 0 {
 			fullResp.WriteString(msg.Content) // 聚合
+			
 			cb(msg.Content)                   // 实时调用cb函数，方便主动发送给前端
 		}
 	}

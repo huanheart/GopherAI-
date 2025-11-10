@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -85,7 +84,14 @@ func CreateStreamSessionOnly(userName string, userQuestion string) (string, code
 
 // This function streams a message to an already existing session.
 // It's basically the old ChatStreamSend, but we'll rename ChatStreamSend to this to be clearer.
-func StreamMessageToExistingSession(userName string, sessionID string, userQuestion string, modelType string, writer gin.ResponseWriter) code.Code {
+func StreamMessageToExistingSession(userName string, sessionID string, userQuestion string, modelType string, writer http.ResponseWriter) code.Code {
+	// 确保 writer 支持 Flush
+	flusher, ok := writer.(http.Flusher)
+	if !ok {
+		log.Println("StreamMessageToExistingSession: streaming unsupported")
+		return code.CodeServerBusy
+	}
+
 	manager := aihelper.GetGlobalManager()
 	config := map[string]interface{}{
 		"apiKey": "your-api-key", // TODO: 从配置中获取
@@ -97,8 +103,16 @@ func StreamMessageToExistingSession(userName string, sessionID string, userQuest
 	}
 
 	cb := func(msg string) {
-		writer.WriteString("data: " + msg + "\n\n")
-		writer.(http.Flusher).Flush()
+		// 直接发送数据，不转义
+		// SSE 格式：data: <content>\n\n
+		log.Printf("[SSE] Sending chunk: %s (len=%d)\n", msg, len(msg))
+		_, err := writer.Write([]byte("data: " + msg + "\n\n"))
+		if err != nil {
+			log.Println("[SSE] Write error:", err)
+			return
+		}
+		flusher.Flush() // 🔥 每次必须 flush
+		log.Println("[SSE] Flushed")
 	}
 
 	_, err_ := helper.StreamResponse(userName, ctx, cb, userQuestion)
@@ -108,14 +122,18 @@ func StreamMessageToExistingSession(userName string, sessionID string, userQuest
 	}
 
 	// After the stream is finished, send the final DONE signal.
-	writer.WriteString("data: [DONE]\n\n")
-	writer.(http.Flusher).Flush()
+	_, err = writer.Write([]byte("data: [DONE]\n\n"))
+	if err != nil {
+		log.Println("StreamMessageToExistingSession write DONE error:", err)
+		return code.AIModelFail
+	}
+	flusher.Flush()
 
 	return code.CodeSuccess
 }
 
 // The old function now uses the new building blocks. It is kept for logical separation.
-func CreateStreamSessionAndSendMessage(userName string, userQuestion string, modelType string, writer gin.ResponseWriter) (string, code.Code) {
+func CreateStreamSessionAndSendMessage(userName string, userQuestion string, modelType string, writer http.ResponseWriter) (string, code.Code) {
 	// Step 1: Create the session record.
 	sessionID, code_ := CreateStreamSessionOnly(userName, userQuestion)
 	if code_ != code.CodeSuccess {
@@ -179,7 +197,7 @@ func GetChatHistory(userName string, sessionID string) ([]model.History, code.Co
 	return history, code.CodeSuccess
 }
 
-func ChatStreamSend(userName string, sessionID string, userQuestion string, modelType string, writer gin.ResponseWriter) code.Code {
+func ChatStreamSend(userName string, sessionID string, userQuestion string, modelType string, writer http.ResponseWriter) code.Code {
 	// This function now just calls the new, more descriptive function.
 	return StreamMessageToExistingSession(userName, sessionID, userQuestion, modelType, writer)
 }

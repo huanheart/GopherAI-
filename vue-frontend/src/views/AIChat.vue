@@ -269,6 +269,7 @@ export default {
       }
 
       // push placeholder into currentMessages (view)
+      const aiMessageIndex = currentMessages.value.length
       currentMessages.value.push(aiMessage)
       // If continue existing session, also push into sessions' message array immediately to keep sync
       if (!tempSession.value && currentSessionId.value && sessions.value[currentSessionId.value]) {
@@ -290,154 +291,116 @@ export default {
         ? { question: question, modelType: selectedModel.value }
         : { question: question, modelType: selectedModel.value, sessionId: currentSessionId.value }
 
-      // fetch + stream reading
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body)
-      })
+      try {
+        // 创建 fetch 连接读取 SSE 流
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body)
+        })
 
-      if (!response.ok) {
-        // network/HTTP error
-        loading.value = false
-        throw new Error('Network response was not ok')
-      }
+        if (!response.ok) {
+          loading.value = false
+          throw new Error('Network response was not ok')
+        }
 
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = '' // keep incomplete line
-      // we'll update the aiMessage.content via smooth append to avoid flash
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
 
-      // initialize buffer entry for this aiId
-      // No longer using render buffers.
+        // 读取流数据
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
 
-      async function processChunk(chunkText) {
-        // chunkText may include several SSE lines or partial
-        buffer += chunkText
-        const lines = buffer.split('\n')
-        buffer = lines.pop() // leftover
+          const chunk = decoder.decode(value, { stream: true })
+          buffer += chunk
 
-        for (const rawLine of lines) {
-          const line = rawLine.trim()
-          if (!line) continue
+          // 按行分割
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || '' // 保留未完成的行
 
-          if (line.startsWith('event:')) {
-            const event = line.slice(6).trim()
-            // handle event lines
-            if (event === 'session') {
-              // next line should be data with sessionId
-              continue
-            } else if (event === 'end') {
-              // stream ended
-              aiMessage.meta = { status: 'done' }
-              return { doneSignal: true }
-            }
-          } else if (line.startsWith('data:')) {
-            const data = line.slice(5).trim();
+          for (const line of lines) {
+            const trimmedLine = line.trim()
+            if (!trimmedLine) continue
 
-            // --- Rollback to stable direct-append version ---
-            if (data.startsWith('{')) {
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.sessionId) {
-                  const newSid = String(parsed.sessionId);
-                  if (tempSession.value) {
-                    sessions.value[newSid] = {
-                      id: newSid,
-                      name: '新会话',
-                      messages: [...currentMessages.value]
-                    };
-                    currentSessionId.value = newSid;
-                    tempSession.value = false;
+            // 处理 SSE 格式：data: <content>
+            if (trimmedLine.startsWith('data:')) {
+              const data = trimmedLine.slice(5).trim()
+              console.log('[SSE] Received:', data) // 调试日志
+
+              if (data === '[DONE]') {
+                // 流结束
+                console.log('[SSE] Stream done')
+                loading.value = false
+                currentMessages.value[aiMessageIndex].meta = { status: 'done' }
+                currentMessages.value = [...currentMessages.value]
+              } else if (data.startsWith('{')) {
+                // 尝试解析 JSON（如 sessionId）
+                try {
+                  const parsed = JSON.parse(data)
+                  if (parsed.sessionId) {
+                    const newSid = String(parsed.sessionId)
+                    console.log('[SSE] Session ID:', newSid)
+                    if (tempSession.value) {
+                      sessions.value[newSid] = {
+                        id: newSid,
+                        name: '新会话',
+                        messages: [...currentMessages.value]
+                      }
+                      currentSessionId.value = newSid
+                      tempSession.value = false
+                    }
                   }
+                } catch (e) {
+                  // 不是 JSON，当作普通文本处理
+                  currentMessages.value[aiMessageIndex].content += data
+                  console.log('[SSE] Content updated:', currentMessages.value[aiMessageIndex].content.length)
                 }
-              } catch (e) {
-                // Not a valid JSON, maybe a text message that starts with '{'. Append it.
-                aiMessage.content += data;
+              } else {
+                // 普通文本数据，直接追加
+                // 使用数组索引直接更新，强制 Vue 响应式系统检测变化
+                currentMessages.value[aiMessageIndex].content += data
+                console.log('[SSE] Content updated:', currentMessages.value[aiMessageIndex].content.length)
               }
-            } else if (data === '[DONE]') {
-              // This is the explicit end signal.
-              aiMessage.meta = { status: 'done' };
-              return { doneSignal: true };
-            } else {
-              // This is a plain text chunk. Append it directly.
-              aiMessage.content += data;
-              nextTick(scrollToBottom); // Scroll as content arrives
+
+              // 每收到一条数据就立即更新 DOM
+              // 强制更新整个数组以触发响应式
+              currentMessages.value = [...currentMessages.value]
+              
+              // 使用 requestAnimationFrame 强制浏览器重排
+              await new Promise(resolve => {
+                requestAnimationFrame(() => {
+                  scrollToBottom()
+                  resolve()
+                })
+              })
             }
           }
         }
 
-        return { doneSignal: false }
-      }
+        // 流读取完成后的处理
+        loading.value = false
+        currentMessages.value[aiMessageIndex].meta = { status: 'done' }
+        currentMessages.value = [...currentMessages.value]
 
-      // read loop
-      try {
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) {
-            // stream ended; mark done
-            loading.value = false
-            // allow remaining buffer to flush via timer
-            // finalize: remove streaming meta after short delay to allow last chars to render
-            setTimeout(() => {
-              aiMessage.meta = { status: 'done' }
-              // synchronize with sessions store: if we have an active session, update stored messages
-              if (!tempSession.value && currentSessionId.value && sessions.value[currentSessionId.value]) {
-                // find last assistant message in sessions and set its content to current content
-                const sessMsgs = sessions.value[currentSessionId.value].messages
-                if (Array.isArray(sessMsgs) && sessMsgs.length) {
-                  // last assistant in sessMsgs likely corresponds to this ai placeholder; update
-                  let lastIndex = sessMsgs.length - 1
-                  // ensure it's assistant role
-                  if (sessMsgs[lastIndex] && sessMsgs[lastIndex].role === 'assistant') {
-                    sessMsgs[lastIndex].content = aiMessage.content
-                  } else {
-                    // push if not present
-                    sessMsgs.push({ role: 'assistant', content: aiMessage.content })
-                  }
-                }
-              } else if (!tempSession.value && currentSessionId.value) {
-                // If session exists but messages array empty, set it
-                if (!sessions.value[currentSessionId.value].messages) {
-                  sessions.value[currentSessionId.value].messages = [...currentMessages.value]
-                }
-              }
-              // cleanup buffer entry
-              // _clearBuffer(aiId) // Removed
-            }, 350)
-            break
-          } else {
-            const chunkText = decoder.decode(value, { stream: true });
-            const { doneSignal } = await processChunk(chunkText);
-            if (doneSignal) {
-              // The server has sent the [DONE] signal. We can stop reading.
-              loading.value = false;
-              // Finalize and clean up, similar to the 'done' block below.
-              setTimeout(() => {
-                aiMessage.meta = { status: 'done' };
-                if (!tempSession.value && currentSessionId.value && sessions.value[currentSessionId.value]) {
-                  const sessMsgs = sessions.value[currentSessionId.value].messages;
-                  if (Array.isArray(sessMsgs) && sessMsgs.length) {
-                    let lastAsst = sessMsgs[sessMsgs.length - 1]
-                    if (lastAsst.role === "assistant") {
-                      lastAsst.content = aiMessage.content
-                    }
-                  }
-                }
-              }, 350);
-              break; // Exit the while (true) loop
+        // 同步到 sessions 存储
+        if (!tempSession.value && currentSessionId.value && sessions.value[currentSessionId.value]) {
+          const sessMsgs = sessions.value[currentSessionId.value].messages
+          if (Array.isArray(sessMsgs) && sessMsgs.length) {
+            const lastIndex = sessMsgs.length - 1
+            if (sessMsgs[lastIndex] && sessMsgs[lastIndex].role === 'assistant') {
+              sessMsgs[lastIndex].content = currentMessages.value[aiMessageIndex].content
             }
           }
         }
       } catch (err) {
-        console.error('Stream reading error:', err)
+        console.error('Stream error:', err)
         loading.value = false
-        aiMessage.meta = { status: 'error' }
-        // _clearBuffer(aiId) // Removed
-      } finally {
-        // ensure we set loading false for streaming case
-        loading.value = false
+        currentMessages.value[aiMessageIndex].meta = { status: 'error' }
+        currentMessages.value = [...currentMessages.value]
+        ElMessage.error('流式传输出错')
       }
     }
 
