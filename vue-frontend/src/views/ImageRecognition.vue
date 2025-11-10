@@ -94,7 +94,7 @@ export default {
           },
         })
 
-          // Check for a specific success field, or just status_code
+
         if (response.data && response.data.class_name) {
              const aiText = `识别结果: ${response.data.class_name}`
             messages.value.push({
@@ -114,13 +114,13 @@ export default {
           content: `[错误] 无法连接到服务器或上传失败: ${error.message}`,
         })
       } finally {
-            // Revoke the object URL to free up memory
+
         URL.revokeObjectURL(imageUrl)
 
             await nextTick()
         scrollToBottom()
 
-            // Clear the file input
+
         selectedFile.value = null
         if (fileInputRef.value) {
           fileInputRef.value.value = ''

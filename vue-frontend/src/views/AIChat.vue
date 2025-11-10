@@ -71,17 +71,7 @@
 </template>
 
 <script>
-/*
-  完整 AIChat.vue
-  - 保持你指定的接口路径不变
-  - 修复两个问题：
-    1) 流式调用：首次新会话走 /api/AI/chat/send-stream-new-session，已有会话走 /api/AI/chat/send-stream
-    2) 逐字（逐小片段）优雅渲染：smoothAppend 实现，避免一次性完整渲染
-  说明：后端返回格式未强制要求，这里兼容常见三种流数据形式：
-    - 纯文本 data: some text
-    - JSON 包含 {"delta":"..."} 或 {"sessionId":"..."}（我们会尝试解析）
-    - [DONE] 标志结束
-*/
+
 
 import { ref, nextTick, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -90,11 +80,11 @@ import api from '../utils/api'
 export default {
   name: 'AIChat',
   setup() {
-    // === reactive state ===
-    const sessions = ref({})               // map: sessionId -> {id, name, messages: []}
-    const currentSessionId = ref(null)     // string or 'temp'
-    const tempSession = ref(false)         // true when user created a temp new session (not persisted)
-    const currentMessages = ref([])        // array used for rendering (detached copy)
+
+    const sessions = ref({})               
+    const currentSessionId = ref(null)    
+    const tempSession = ref(false)        
+    const currentMessages = ref([])      
     const inputMessage = ref('')
     const loading = ref(false)
     const messagesRef = ref(null)
@@ -102,10 +92,7 @@ export default {
     const selectedModel = ref('1')
     const isStreaming = ref(false)
 
-    // --- Rollback to stable direct-append version ---
-    // Typewriter effect has been removed to ensure stability.
 
-    // === utility functions ===
     const renderMarkdown = (text) => {
       if (!text && text !== '') return ''
       return String(text)
@@ -181,7 +168,7 @@ export default {
         }
       }
 
-      // detach copy
+
       currentMessages.value = [...(sessions.value[sessionId].messages || [])]
       await nextTick()
       scrollToBottom()
@@ -212,7 +199,7 @@ export default {
       }
     }
 
-    // === send message entry ===
+
     const sendMessage = async () => {
       if (!inputMessage.value || !inputMessage.value.trim()) {
         ElMessage.warning('请输入消息内容')
@@ -226,7 +213,7 @@ export default {
       const currentInput = inputMessage.value
       inputMessage.value = ''
 
-      // push user message into currentMessages (view)
+
       currentMessages.value.push(userMessage)
       await nextTick()
       scrollToBottom()
@@ -234,18 +221,18 @@ export default {
       try {
         loading.value = true
         if (isStreaming.value) {
-          // streaming flow
+
           await handleStreaming(currentInput)
         } else {
-          // normal non-streaming
+
           await handleNormal(currentInput)
         }
       } catch (err) {
         console.error('Send message error:', err)
         ElMessage.error('发送失败，请重试')
-        // rollback view
+
         if (!tempSession.value && currentSessionId.value && sessions.value[currentSessionId.value] && sessions.value[currentSessionId.value].messages) {
-          // If we were supposed to push to sessions, pop
+
           const sessionArr = sessions.value[currentSessionId.value].messages
           if (sessionArr && sessionArr.length) sessionArr.pop()
         }
@@ -259,28 +246,28 @@ export default {
       }
     }
 
-    // === streaming handler ===
+
     async function handleStreaming(question) {
-      // Create ai message placeholder and meta
+
       const aiMessage = {
         role: 'assistant',
         content: '',
         meta: { status: 'streaming' } // mark streaming
       }
 
-      // push placeholder into currentMessages (view)
+
       const aiMessageIndex = currentMessages.value.length
       currentMessages.value.push(aiMessage)
-      // If continue existing session, also push into sessions' message array immediately to keep sync
+
       if (!tempSession.value && currentSessionId.value && sessions.value[currentSessionId.value]) {
         if (!sessions.value[currentSessionId.value].messages) sessions.value[currentSessionId.value].messages = []
         sessions.value[currentSessionId.value].messages.push({ role: 'assistant', content: '' })
       }
 
-      // Choose URL based on tempSession and keep EXACT paths you required
+
       const url = tempSession.value
-        ? '/api/AI/chat/send-stream-new-session'  // first time new session streaming
-        : '/api/AI/chat/send-stream'              // subsequent streaming in existing session
+        ? '/api/AI/chat/send-stream-new-session'  
+        : '/api/AI/chat/send-stream'           
 
       const headers = {
         'Content-Type': 'application/json',
@@ -404,10 +391,10 @@ export default {
       }
     }
 
-    // === non-streaming handler ===
+
     async function handleNormal(question) {
       if (tempSession.value) {
-        // create new session with single request
+
         const response = await api.post('/AI/chat/send-new-session', {
           question: question,
           modelType: selectedModel.value
@@ -418,7 +405,7 @@ export default {
             role: 'assistant',
             content: response.data.Information || ''
           }
-          // create session entry
+
           sessions.value[sessionId] = {
             id: sessionId,
             name: '新会话',
@@ -429,15 +416,15 @@ export default {
           currentMessages.value = [...sessions.value[sessionId].messages]
         } else {
           ElMessage.error(response.data?.status_msg || '发送失败')
-          // rollback
+
           currentMessages.value.pop()
         }
       } else {
-        // continue existing session
+
         const sessionMsgs = sessions.value[currentSessionId.value].messages
-        // push user into persistent session array
+
         sessionMsgs.push({ role: 'user', content: question })
-        // call send
+
         const response = await api.post('/AI/chat/send', {
           question: question,
           modelType: selectedModel.value,
@@ -455,7 +442,7 @@ export default {
       }
     }
 
-    // === scrolling ===
+
     const scrollToBottom = () => {
       if (messagesRef.value) {
         try {

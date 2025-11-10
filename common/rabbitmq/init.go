@@ -1,7 +1,7 @@
 package rabbitmq
 
 var (
-	// RMQUpload          *RabbitMQ
+
 	RMQMessage *RabbitMQ
 )
 
@@ -10,17 +10,12 @@ func InitRabbitMQ() {
 	// 无论调用多少次 NewWorkRabbitMQ，只会创建一次连接
 	// 不同队列共用一个连接，可以保持不同队列消费消息的顺序
 
-	// RMQUpload = NewWorkRabbitMQ("Upload")
-	// go RMQUpload.Consume(Upload)
-
 	RMQMessage = NewWorkRabbitMQ("Message")
 	go RMQMessage.Consume(MQMessage)
 
 }
 
 // DestroyRabbitMQ 销毁RabbitMQ
-
 func DestroyRabbitMQ() {
-	// RMQUpload.Destroy()
 	RMQMessage.Destroy()
 }

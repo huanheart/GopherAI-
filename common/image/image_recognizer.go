@@ -140,12 +140,12 @@ func (r *ImageRecognizer) PredictFromBuffer(buf []byte) (string, error) {
 	return r.PredictFromImage(img)
 }
 
-// PredictFromImage is the core prediction function that takes a Go `image.Image`
+
 func (r *ImageRecognizer) PredictFromImage(img image.Image) (string, error) {
-	// Create a new RGBA image to draw the resized image on.
+
 	resizedImg := image.NewRGBA(image.Rect(0, 0, r.inputW, r.inputH))
 
-	// Resize the image using a high-quality rescaler.
+
 	draw.CatmullRom.Scale(resizedImg, resizedImg.Bounds(), img, img.Bounds(), draw.Over, nil)
 
 	h, w := r.inputH, r.inputW
@@ -155,10 +155,10 @@ func (r *ImageRecognizer) PredictFromImage(img image.Image) (string, error) {
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			c := resizedImg.At(x, y)
-			// image.At() returns color.Color, we need to get the r,g,b,a values
+
 			r, g, b, _ := c.RGBA()
 
-			// The returned values are in the range [0, 65535]. We need to convert them to [0, 255] and then to float32 [0.0, 1.0]
+
 			rf := float32(r>>8) / 255.0
 			gf := float32(g>>8) / 255.0
 			bf := float32(b>>8) / 255.0

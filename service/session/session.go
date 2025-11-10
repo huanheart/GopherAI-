@@ -66,8 +66,7 @@ func CreateSessionAndSendMessage(userName string, userQuestion string, modelType
 	return createdSession.ID, aiResponse.Content, code.CodeSuccess
 }
 
-// --- MODIFICATION START ---
-// This function ONLY creates a session database record.
+
 func CreateStreamSessionOnly(userName string, userQuestion string) (string, code.Code) {
 	newSession := &model.Session{
 		ID:       uuid.New().String(),
@@ -82,8 +81,7 @@ func CreateStreamSessionOnly(userName string, userQuestion string) (string, code
 	return createdSession.ID, code.CodeSuccess
 }
 
-// This function streams a message to an already existing session.
-// It's basically the old ChatStreamSend, but we'll rename ChatStreamSend to this to be clearer.
+
 func StreamMessageToExistingSession(userName string, sessionID string, userQuestion string, modelType string, writer http.ResponseWriter) code.Code {
 	// 确保 writer 支持 Flush
 	flusher, ok := writer.(http.Flusher)
@@ -111,7 +109,7 @@ func StreamMessageToExistingSession(userName string, sessionID string, userQuest
 			log.Println("[SSE] Write error:", err)
 			return
 		}
-		flusher.Flush() // 🔥 每次必须 flush
+		flusher.Flush() //  每次必须 flush
 		log.Println("[SSE] Flushed")
 	}
 
@@ -121,7 +119,7 @@ func StreamMessageToExistingSession(userName string, sessionID string, userQuest
 		return code.AIModelFail
 	}
 
-	// After the stream is finished, send the final DONE signal.
+
 	_, err = writer.Write([]byte("data: [DONE]\n\n"))
 	if err != nil {
 		log.Println("StreamMessageToExistingSession write DONE error:", err)
@@ -132,25 +130,25 @@ func StreamMessageToExistingSession(userName string, sessionID string, userQuest
 	return code.CodeSuccess
 }
 
-// The old function now uses the new building blocks. It is kept for logical separation.
+
 func CreateStreamSessionAndSendMessage(userName string, userQuestion string, modelType string, writer http.ResponseWriter) (string, code.Code) {
-	// Step 1: Create the session record.
+
 	sessionID, code_ := CreateStreamSessionOnly(userName, userQuestion)
 	if code_ != code.CodeSuccess {
 		return "", code_
 	}
 
-	// Step 2: Stream the message to the newly created session.
+
 	code_ = StreamMessageToExistingSession(userName, sessionID, userQuestion, modelType, writer)
 	if code_ != code.CodeSuccess {
-		// Even if streaming fails, we return the session ID so the client knows about it.
+
 		return sessionID, code_
 	}
 
 	return sessionID, code.CodeSuccess
 }
 
-// --- MODIFICATION END ---
+
 
 func ChatSend(userName string, sessionID string, userQuestion string, modelType string) (string, code.Code) {
 	//1：获取AIHelper
@@ -198,6 +196,6 @@ func GetChatHistory(userName string, sessionID string) ([]model.History, code.Co
 }
 
 func ChatStreamSend(userName string, sessionID string, userQuestion string, modelType string, writer http.ResponseWriter) code.Code {
-	// This function now just calls the new, more descriptive function.
+
 	return StreamMessageToExistingSession(userName, sessionID, userQuestion, modelType, writer)
 }
