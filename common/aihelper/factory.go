@@ -37,8 +37,12 @@ func (f *AIModelFactory) registerCreators() {
 		return NewOpenAIModel(ctx)
 	}
 
-	//Ollama
 	f.creators["2"] = func(ctx context.Context, config map[string]interface{}) (AIModel, error) {
+		return NewOpenAIModel(ctx)
+	}
+
+	//Ollama（目前提供接口实现，暂不提供应用，因为考虑到本地模型会占用很多空间）todo做
+	f.creators["3"] = func(ctx context.Context, config map[string]interface{}) (AIModel, error) {
 		baseURL, _ := config["baseURL"].(string)
 		modelName, ok := config["modelName"].(string)
 		if !ok {

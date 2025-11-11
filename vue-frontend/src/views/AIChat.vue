@@ -31,6 +31,14 @@
           <input type="checkbox" id="streamingMode" v-model="isStreaming" />
           流式响应
         </label>
+        <button class="upload-btn" @click="triggerFileUpload" :disabled="uploading">📎 上传文档(.md/.txt)</button>
+        <input
+          ref="fileInput"
+          type="file"
+          accept=".md,.txt,text/markdown,text/plain"
+          style="display: none"
+          @change="handleFileUpload"
+        />
       </div>
 
       <div class="chat-messages" ref="messagesRef">
@@ -81,16 +89,18 @@ export default {
   name: 'AIChat',
   setup() {
 
-    const sessions = ref({})               
-    const currentSessionId = ref(null)    
-    const tempSession = ref(false)        
-    const currentMessages = ref([])      
+    const sessions = ref({})
+    const currentSessionId = ref(null)
+    const tempSession = ref(false)
+    const currentMessages = ref([])
     const inputMessage = ref('')
     const loading = ref(false)
     const messagesRef = ref(null)
     const messageInput = ref(null)
     const selectedModel = ref('1')
     const isStreaming = ref(false)
+    const uploading = ref(false)
+    const fileInput = ref(null)
 
 
     const renderMarkdown = (text) => {
@@ -453,6 +463,55 @@ export default {
       }
     }
 
+    const triggerFileUpload = () => {
+      if (fileInput.value) {
+        fileInput.value.click()
+      }
+    }
+
+    const handleFileUpload = async (event) => {
+      const file = event.target.files[0]
+      if (!file) return
+
+      // 前端校验：只允许.md或.txt文件
+      const fileName = file.name.toLowerCase()
+      if (!fileName.endsWith('.md') && !fileName.endsWith('.txt')) {
+        ElMessage.error('只允许上传 .md 或 .txt 文件')
+        // 清空文件输入
+        if (fileInput.value) {
+          fileInput.value.value = ''
+        }
+        return
+      }
+
+      try {
+        uploading.value = true
+        const formData = new FormData()
+        formData.append('file', file)
+
+        const response = await api.post('/file/upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+
+        if (response.data && response.data.status_code === 1000) {
+          ElMessage.success(`文件上传成功`)
+        } else {
+          ElMessage.error(response.data?.status_msg || '上传失败')
+        }
+      } catch (error) {
+        console.error('File upload error:', error)
+        ElMessage.error('文件上传失败')
+      } finally {
+        uploading.value = false
+        // 清空文件输入
+        if (fileInput.value) {
+          fileInput.value.value = ''
+        }
+      }
+    }
+
     onMounted(() => {
       loadSessions()
     })
@@ -469,12 +528,16 @@ export default {
       messageInput,
       selectedModel,
       isStreaming,
+      uploading,
+      fileInput,
       renderMarkdown,
       playTTS,
       createNewSession,
       switchSession,
       syncHistory,
-      sendMessage
+      sendMessage,
+      triggerFileUpload,
+      handleFileUpload
     }
   }
 }
@@ -670,6 +733,30 @@ export default {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+.upload-btn {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(245, 87, 108, 0.2);
+  transition: all 0.2s ease;
+}
+
+.upload-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(245, 87, 108, 0.3);
+}
+
+.upload-btn:disabled {
+  background: #ccc;
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 .chat-messages {
