@@ -48,21 +48,33 @@ type Rabbitmq struct {
 	RabbitmqVhost    string `toml:"vhost"`
 }
 
+type RagModelConfig struct {
+	RagEmbeddingModel string `toml:"embeddingModel"`
+	RagChatModelName  string `toml:"chatModelName"`
+	RagDocDir         string `toml:"docDir"`
+	RagBaseUrl        string `toml:"baseUrl"`
+}
+
 type Config struct {
-	EmailConfig `toml:"emailConfig"`
-	RedisConfig `toml:"redisConfig"`
-	MysqlConfig `toml:"mysqlConfig"`
-	JwtConfig   `toml:"jwtConfig"`
-	MainConfig  `toml:"mainConfig"`
-	Rabbitmq    `toml:"rabbitmqConfig"`
+	EmailConfig    `toml:"emailConfig"`
+	RedisConfig    `toml:"redisConfig"`
+	MysqlConfig    `toml:"mysqlConfig"`
+	JwtConfig      `toml:"jwtConfig"`
+	MainConfig     `toml:"mainConfig"`
+	Rabbitmq       `toml:"rabbitmqConfig"`
+	RagModelConfig `toml:"ragModelConfig"`
 }
 
 type RedisKeyConfig struct {
-	CaptchaPrefix string
+	CaptchaPrefix   string
+	IndexName       string
+	IndexNamePrefix string
 }
 
 var DefaultRedisKeyConfig = RedisKeyConfig{
-	CaptchaPrefix: "captcha:%s",
+	CaptchaPrefix:   "captcha:%s",
+	IndexName:       "rag_docs:%s:idx",
+	IndexNamePrefix: "rag_docs:%s:",
 }
 
 var config *Config

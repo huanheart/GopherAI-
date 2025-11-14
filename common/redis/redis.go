@@ -3,14 +3,15 @@ package redis
 import (
 	"GopherAI/config"
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	redisCli "github.com/redis/go-redis/v9"
 )
 
-var Rdb *redis.Client
+var Rdb *redisCli.Client
 
 var ctx = context.Background()
 
@@ -22,10 +23,11 @@ func Init() {
 	db := conf.RedisDb
 	addr := host + ":" + strconv.Itoa(port)
 
-	Rdb = redis.NewClient(&redis.Options{
+	Rdb = redisCli.NewClient(&redisCli.Options{
 		Addr:     addr,
 		Password: password,
 		DB:       db,
+		Protocol: 2, // 使用 Protocol 2 避免 maint_notifications 警告
 	})
 
 }
@@ -36,23 +38,18 @@ func SetCaptchaForEmail(email, captcha string) error {
 	return Rdb.Set(ctx, key, captcha, expire).Err()
 }
 
-
-
 func CheckCaptchaForEmail(email, userInput string) (bool, error) {
 	key := GenerateCaptcha(email)
 
-
 	storedCaptcha, err := Rdb.Get(ctx, key).Result()
 	if err != nil {
-		if err == redis.Nil {
+		if err == redisCli.Nil {
 
 			return false, nil
 		}
 
 		return false, err
 	}
-
-
 
 	if strings.EqualFold(storedCaptcha, userInput) {
 
@@ -65,6 +62,48 @@ func CheckCaptchaForEmail(email, userInput string) (bool, error) {
 		return true, nil
 	}
 
-
 	return false, nil
+}
+
+// InitRedisIndex 初始化 Redis 索引，支持按文件名区分
+func InitRedisIndex(ctx context.Context, filename string, dimension int) error {
+	indexName := GenerateIndexName(filename)
+
+	// 检查索引是否存在
+	_, err := Rdb.Do(ctx, "FT.INFO", indexName).Result()
+	if err == nil {
+		fmt.Println("索引已存在，跳过创建")
+		return nil
+	}
+
+	// 如果索引不存在，创建新索引
+	if !strings.Contains(err.Error(), "Unknown index name") {
+		return fmt.Errorf("检查索引失败: %w", err)
+	}
+
+	fmt.Println("正在创建 Redis 索引...")
+
+	prefix := GenerateIndexNamePrefix(filename)
+
+	// 创建索引
+	createArgs := []interface{}{
+		"FT.CREATE", indexName,
+		"ON", "HASH",
+		"PREFIX", "1", prefix,
+		"SCHEMA",
+		"content", "TEXT",
+		"metadata", "TEXT",
+		"vector", "VECTOR", "FLAT",
+		"6",
+		"TYPE", "FLOAT32",
+		"DIM", dimension,
+		"DISTANCE_METRIC", "COSINE",
+	}
+
+	if err := Rdb.Do(ctx, createArgs...).Err(); err != nil {
+		return fmt.Errorf("创建索引失败: %w", err)
+	}
+
+	fmt.Println("索引创建成功！")
+	return nil
 }

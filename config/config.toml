@@ -33,3 +33,9 @@ charset =  "utf8mb4"
   username= "root"
   password= "123456"
   vhost= "/"
+
+ [ragModelConfig]
+  embeddingModel= "text-embedding-v4"
+  chatModelName="qwen-turbo"
+  docDir = "./docs"
+  baseUrl="https://dashscope.aliyuncs.com/compatible-mode/v1"
