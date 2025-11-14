@@ -39,3 +39,4 @@ charset =  "utf8mb4"
   chatModelName="qwen-turbo"
   docDir = "./docs"
   baseUrl="https://dashscope.aliyuncs.com/compatible-mode/v1"
+  dimension=1024

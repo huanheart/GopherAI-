@@ -53,6 +53,7 @@ type RagModelConfig struct {
 	RagChatModelName  string `toml:"chatModelName"`
 	RagDocDir         string `toml:"docDir"`
 	RagBaseUrl        string `toml:"baseUrl"`
+	RagDimension      int    `toml:"dimension"`
 }
 
 type Config struct {

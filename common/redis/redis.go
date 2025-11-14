@@ -107,3 +107,16 @@ func InitRedisIndex(ctx context.Context, filename string, dimension int) error {
 	fmt.Println("索引创建成功！")
 	return nil
 }
+
+// DeleteRedisIndex 删除 Redis 索引，支持按文件名区分
+func DeleteRedisIndex(ctx context.Context, filename string) error {
+	indexName := GenerateIndexName(filename)
+
+	// 删除索引
+	if err := Rdb.Do(ctx, "FT.DROPINDEX", indexName).Err(); err != nil {
+		return fmt.Errorf("删除索引失败: %w", err)
+	}
+
+	fmt.Println("索引删除成功！")
+	return nil
+}
