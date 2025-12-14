@@ -9,6 +9,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+// test
 // WeatherAPIClient 是一个模拟的天气API客户端
 type WeatherAPIClient struct {
 	baseURL string
