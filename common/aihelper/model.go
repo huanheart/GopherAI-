@@ -392,7 +392,7 @@ func (m *MCPModel) GenerateResponse(ctx context.Context, messages []*schema.Mess
 	if err != nil {
 		return nil, fmt.Errorf("mcp first generate failed: %v", err)
 	}
-
+	log.Println("first resp is ", firstResp)
 	// 解析AI响应
 	aiResult := firstResp.Content
 	toolCall, err := m.parseAIResponse(aiResult)
@@ -403,9 +403,10 @@ func (m *MCPModel) GenerateResponse(ctx context.Context, messages []*schema.Mess
 
 	// 情况1：AI不调用工具，直接返回响应
 	if !toolCall.IsToolCall {
+		log.Println("toolCall IsToolCall is false ", firstResp)
 		return firstResp, nil
 	}
-
+	log.Println("toolCall IsToolCall is true ", firstResp)
 	// 情况2：AI要调用工具
 	// 获取MCP客户端
 	mcpClient, err := m.getMCPClient(ctx)
@@ -432,10 +433,11 @@ func (m *MCPModel) GenerateResponse(ctx context.Context, messages []*schema.Mess
 
 	// 调用LLM生成最终响应
 	finalResp, err := m.llm.Generate(ctx, secondMessages)
+
 	if err != nil {
 		return nil, fmt.Errorf("mcp second generate failed: %v", err)
 	}
-
+	log.Println("最终响应为：", finalResp)
 	return finalResp, nil
 }
 

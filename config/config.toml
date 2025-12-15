@@ -28,7 +28,7 @@ charset =  "utf8mb4"
  key= "GopherAI-v1"
 
  [rabbitmqConfig]
-  host= "127.0.0.1"
+  host= "rabbitmq"
   port= 5672
   username= "root"
   password= "123456"
