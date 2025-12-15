@@ -24,13 +24,8 @@ The server package provides functionality to start an MCP server.
 ```go
 import "github.com/yourusername/gopherai/common/mcp/server"
 
-// Start a stdio server
-if err := server.StartServer("stdio", ""); err != nil {
-    log.Fatalf("Server error: %v", err)
-}
-
 // Start an HTTP server
-if err := server.StartServer("http", ":8080"); err != nil {
+if err := server.StartServer(":8080"); err != nil {
     log.Fatalf("Server error: %v", err)
 }
 ```
@@ -38,8 +33,7 @@ if err := server.StartServer("http", ":8080"); err != nil {
 ### Functions
 
 - `NewMCPServer()` - Creates a new MCP server instance
-- `StartServer(transportType string, httpAddr string) error` - Starts the MCP server
-  - `transportType`: "stdio" or "http"
+- `StartServer(httpAddr string) error` - Starts the MCP server
   - `httpAddr`: HTTP server address (e.g., ":8080")
 
 ## Client Package
@@ -55,7 +49,7 @@ import (
 )
 
 // Create a client
-mcpClient, err := client.NewMCPClient("stdio", "go run server.go", "")
+mcpClient, err := client.NewMCPClient("http://localhost:8080/mcp")
 if err != nil {
     log.Fatalf("Failed to create client: %v", err)
 }
@@ -81,9 +75,7 @@ fmt.Println(text)
 
 ### Methods
 
-- `NewMCPClient(transportType string, stdioCmd string, httpURL string) (*MCPClient, error)` - Creates a new MCP client
-  - `transportType`: "stdio" or "http"
-  - `stdioCmd`: Command to execute for stdio transport
+- `NewMCPClient(httpURL string) (*MCPClient, error)` - Creates a new MCP client
   - `httpURL`: URL for HTTP transport
 
 - `Initialize(ctx context.Context) (*mcp.InitializeResult, error)` - Initializes the client
@@ -100,7 +92,26 @@ fmt.Println(text)
 
 ## Example
 
-See `example_test.go` for a complete example of how to use both server and client.
+```go
+import (
+    "context"
+    "github.com/yourusername/gopherai/common/mcp/client"
+    "github.com/yourusername/gopherai/common/mcp/server"
+)
+
+// 启动服务器
+server.StartServer(":8080")
+
+// 创建客户端
+mcpClient, _ := client.NewMCPClient("http://localhost:8080/mcp")
+defer mcpClient.Close()
+
+// 使用客户端
+ctx := context.Background()
+mcpClient.Initialize(ctx)
+result, _ := mcpClient.CallWeatherTool(ctx, "深圳")
+fmt.Println(mcpClient.GetToolResultText(result))
+```
 
 ## Dependencies
 

@@ -1,11 +1,8 @@
-package client
+package mcp
 
 import (
 	"context"
 	"fmt"
-	"io"
-	"log"
-	"time"
 
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/client/transport"
@@ -19,70 +16,17 @@ type MCPClient struct {
 }
 
 // NewMCPClient 创建一个新的MCP客户端实例
-// transportType: "stdio" 或 "http"
-// stdioCmd: 当transportType为"stdio"时，要执行的命令
-// httpURL: 当transportType为"http"时，HTTP传输的URL
-func NewMCPClient(transportType string, stdioCmd string, httpURL string) (*MCPClient, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	var c *client.Client
-
-	if transportType == "stdio" {
-		fmt.Println("正在初始化stdio客户端...")
-
-		// 解析命令和参数
-		args := parseCommand(stdioCmd)
-		if len(args) == 0 {
-			return nil, fmt.Errorf("无效的stdio命令")
-		}
-
-		// 创建命令和stdio传输
-		command := args[0]
-		cmdArgs := args[1:]
-
-		// 创建带有详细日志的stdio传输
-		stdioTransport := transport.NewStdio(command, nil, cmdArgs...)
-
-		// 使用传输创建客户端
-		c = client.NewClient(stdioTransport)
-
-		// 启动客户端
-		if err := c.Start(ctx); err != nil {
-			return nil, fmt.Errorf("启动客户端失败: %w", err)
-		}
-
-		// 为stderr设置日志（如果可用）
-		if stderr, ok := client.GetStderr(c); ok {
-			go func() {
-				buf := make([]byte, 4096)
-				for {
-					n, err := stderr.Read(buf)
-					if err != nil {
-						if err != io.EOF {
-							log.Printf("读取stderr错误: %v", err)
-						}
-						return
-					}
-					if n > 0 {
-						fmt.Fprintf(io.Discard, "[Server] %s", buf[:n])
-					}
-				}
-			}()
-		}
-	} else if transportType == "http" {
-		fmt.Println("正在初始化HTTP客户端...")
-		// 创建HTTP传输
-		httpTransport, err := transport.NewStreamableHTTP(httpURL)
-		if err != nil {
-			return nil, fmt.Errorf("创建HTTP传输失败: %w", err)
-		}
-
-		// 使用传输创建客户端
-		c = client.NewClient(httpTransport)
-	} else {
-		return nil, fmt.Errorf("无效的传输类型: %s", transportType)
+// httpURL: HTTP传输的URL
+func NewMCPClient(httpURL string) (*MCPClient, error) {
+	fmt.Println("正在初始化HTTP客户端...")
+	// 创建HTTP传输
+	httpTransport, err := transport.NewStreamableHTTP(httpURL)
+	if err != nil {
+		return nil, fmt.Errorf("创建HTTP传输失败: %w", err)
 	}
+
+	// 使用传输创建客户端
+	c := client.NewClient(httpTransport)
 
 	return &MCPClient{c: c}, nil
 }
@@ -181,41 +125,4 @@ func (m *MCPClient) Close() {
 	if m.c != nil {
 		m.c.Close()
 	}
-}
-
-// parseCommand 将命令字符串分割为命令和参数
-func parseCommand(cmd string) []string {
-	// 这是一个简单的实现，不处理引号或转义
-	var result []string
-	var current string
-	var inQuote bool
-	var quoteChar rune
-
-	for _, r := range cmd {
-		switch {
-		case r == ' ' && !inQuote:
-			if current != "" {
-				result = append(result, current)
-				current = ""
-			}
-		case (r == '"' || r == '\''):
-			if inQuote && r == quoteChar {
-				inQuote = false
-				quoteChar = 0
-			} else if !inQuote {
-				inQuote = true
-				quoteChar = r
-			} else {
-				current += string(r)
-			}
-		default:
-			current += string(r)
-		}
-	}
-
-	if current != "" {
-		result = append(result, current)
-	}
-
-	return result
 }

@@ -1,21 +1,47 @@
-package server
+package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"strconv"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// test
-// WeatherAPIClient 是一个模拟的天气API客户端
-type WeatherAPIClient struct {
-	baseURL string
+/*
+	========================
+	wttr.in JSON 响应结构
+	========================
+*/
+
+type WttrResponse struct {
+	CurrentCondition []struct {
+		TempC         string `json:"temp_C"`
+		Humidity      string `json:"humidity"`
+		WindspeedKmph string `json:"windspeedKmph"`
+		WeatherDesc   []struct {
+			Value string `json:"value"`
+		} `json:"weatherDesc"`
+	} `json:"current_condition"`
+
+	NearestArea []struct {
+		AreaName []struct {
+			Value string `json:"value"`
+		} `json:"areaName"`
+	} `json:"nearest_area"`
 }
 
-// WeatherResponse 表示天气API的响应
+/*
+	========================
+	统一对外天气结构
+	========================
+*/
+
 type WeatherResponse struct {
 	Location    string  `json:"location"`
 	Temperature float64 `json:"temperature"`
@@ -24,72 +50,85 @@ type WeatherResponse struct {
 	WindSpeed   float64 `json:"windSpeed"`
 }
 
-// NewWeatherAPIClient 创建一个新的天气API客户端
-func NewWeatherAPIClient(baseURL string) *WeatherAPIClient {
-	return &WeatherAPIClient{
-		baseURL: baseURL,
-	}
+/*
+	========================
+	Weather API Client
+	（无需 API Key）
+	========================
+*/
+
+type WeatherAPIClient struct{}
+
+func NewWeatherAPIClient() *WeatherAPIClient {
+	return &WeatherAPIClient{}
 }
 
-// GetWeather 查询指定城市的天气
 func (c *WeatherAPIClient) GetWeather(ctx context.Context, city string) (*WeatherResponse, error) {
-	// 模拟响应数据
-	responses := map[string]*WeatherResponse{
-		"北京": {
-			Location:    "北京",
-			Temperature: 15.5,
-			Condition:   "多云",
-			Humidity:    65,
-			WindSpeed:   12.3,
-		},
-		"上海": {
-			Location:    "上海",
-			Temperature: 18.2,
-			Condition:   "晴天",
-			Humidity:    70,
-			WindSpeed:   8.5,
-		},
-		"广州": {
-			Location:    "广州",
-			Temperature: 22.1,
-			Condition:   "阴天",
-			Humidity:    80,
-			WindSpeed:   6.8,
-		},
-		"深圳": {
-			Location:    "深圳",
-			Temperature: 21.8,
-			Condition:   "晴天",
-			Humidity:    75,
-			WindSpeed:   7.2,
-		},
-		"杭州": {
-			Location:    "杭州",
-			Temperature: 16.3,
-			Condition:   "小雨",
-			Humidity:    85,
-			WindSpeed:   5.4,
-		},
+	apiURL := fmt.Sprintf(
+		"https://wttr.in/%s?format=j1&lang=zh",
+		city,
+	)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request failed: %w", err)
 	}
 
-	if resp, ok := responses[city]; ok {
-		return resp, nil
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response failed: %w", err)
 	}
 
-	// 如果城市不在模拟数据中，返回默认值
+	var wttrResp WttrResponse
+	if err := json.Unmarshal(body, &wttrResp); err != nil {
+		return nil, fmt.Errorf("json parse failed: %w", err)
+	}
+
+	if len(wttrResp.CurrentCondition) == 0 {
+		return nil, fmt.Errorf("no weather data")
+	}
+
+	cc := wttrResp.CurrentCondition[0]
+
+	temp, _ := strconv.ParseFloat(cc.TempC, 64)
+	humidity, _ := strconv.Atoi(cc.Humidity)
+	wind, _ := strconv.ParseFloat(cc.WindspeedKmph, 64)
+
+	location := city
+	if len(wttrResp.NearestArea) > 0 &&
+		len(wttrResp.NearestArea[0].AreaName) > 0 {
+		location = wttrResp.NearestArea[0].AreaName[0].Value
+	}
+
+	condition := "未知"
+	if len(cc.WeatherDesc) > 0 {
+		condition = cc.WeatherDesc[0].Value
+	}
+
 	return &WeatherResponse{
-		Location:    city,
-		Temperature: 15.0,
-		Condition:   "未知",
-		Humidity:    50,
-		WindSpeed:   10.0,
+		Location:    location,
+		Temperature: temp,
+		Condition:   condition,
+		Humidity:    humidity,
+		WindSpeed:   wind,
 	}, nil
 }
 
-// NewMCPServer 创建一个新的MCP服务器实例
+/*
+	========================
+	MCP Server
+	========================
+*/
+
 func NewMCPServer() *server.MCPServer {
-	// 创建天气API客户端
-	weatherClient := NewWeatherAPIClient("https://api.weather.com")
+	weatherClient := NewWeatherAPIClient()
 
 	mcpServer := server.NewMCPServer(
 		"weather-query-server",
@@ -98,65 +137,63 @@ func NewMCPServer() *server.MCPServer {
 		server.WithLogging(),
 	)
 
-	// 添加天气查询工具
 	mcpServer.AddTool(
-		mcp.NewTool("get_weather",
+		mcp.NewTool(
+			"get_weather",
 			mcp.WithDescription("获取指定城市的天气信息"),
-			mcp.WithString("city",
-				mcp.Description("要查询天气的城市名称"),
+			mcp.WithString(
+				"city",
+				mcp.Description("城市名称，如 Beijing、上海"),
 				mcp.Required(),
 			),
-		), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			arguments := request.GetArguments()
-			city, ok := arguments["city"].(string)
-			if !ok {
+		),
+		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			args := request.GetArguments()
+			city, ok := args["city"].(string)
+			if !ok || city == "" {
 				return nil, fmt.Errorf("invalid city argument")
 			}
 
-			// 查询天气
 			weather, err := weatherClient.GetWeather(ctx, city)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get weather: %w", err)
+				return nil, err
 			}
 
-			// 格式化天气信息
-			weatherInfo := fmt.Sprintf("城市: %s\n温度: %.1f°C\n天气状况: %s\n湿度: %d%%\n风速: %.1f km/h",
+			resultText := fmt.Sprintf(
+				"城市: %s\n温度: %.1f°C\n天气: %s\n湿度: %d%%\n风速: %.1f km/h",
 				weather.Location,
 				weather.Temperature,
 				weather.Condition,
 				weather.Humidity,
-				weather.WindSpeed)
+				weather.WindSpeed,
+			)
 
 			return &mcp.CallToolResult{
 				Content: []mcp.Content{
 					mcp.TextContent{
 						Type: "text",
-						Text: weatherInfo,
+						Text: resultText,
 					},
 				},
 			}, nil
-		})
+		},
+	)
 
 	return mcpServer
 }
 
+/*
+	========================
+	Server 启动
+	========================
+*/
+
 // StartServer 启动MCP服务器
-// transportType: "stdio" 或 "http"
-// httpAddr: 当transportType为"http"时，HTTP服务器监听的地址（例如":8080"）
-func StartServer(transportType string, httpAddr string) error {
+// httpAddr: HTTP服务器监听的地址（例如":8080"）
+func StartServer(httpAddr string) error {
 	mcpServer := NewMCPServer()
 
-	if transportType == "http" {
-		httpServer := server.NewStreamableHTTPServer(mcpServer)
-		log.Printf("HTTP server listening on %s/mcp", httpAddr)
-		if err := httpServer.Start(httpAddr); err != nil {
-			return fmt.Errorf("server error: %w", err)
-		}
-	} else {
-		if err := server.ServeStdio(mcpServer); err != nil {
-			return fmt.Errorf("server error: %w", err)
-		}
-	}
-
-	return nil
+	httpServer := server.NewStreamableHTTPServer(mcpServer)
+	log.Printf("HTTP MCP server listening on %s/mcp", httpAddr)
+	return httpServer.Start(httpAddr)
 }

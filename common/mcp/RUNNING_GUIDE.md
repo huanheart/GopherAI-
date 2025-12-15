@@ -8,13 +8,7 @@
 
 ```bash
 cd /Users/kaitai/project/GopherAI-/common/mcp
-go run main.go --mode server --transport stdio
-```
-
-或者运行HTTP服务器：
-
-```bash
-go run main.go --mode server --transport http --http-addr :8080
+go run main.go --mode server --http-addr :8080
 ```
 
 ### 2. 运行客户端
@@ -23,13 +17,7 @@ go run main.go --mode server --transport http --http-addr :8080
 
 ```bash
 cd /Users/kaitai/project/GopherAI-/common/mcp
-go run main.go --mode client --transport stdio --city 北京
-```
-
-或者连接到HTTP服务器：
-
-```bash
-go run main.go --mode client --transport http --city 上海
+go run main.go --mode client --city 北京
 ```
 
 ### 3. 使用示例
@@ -37,13 +25,13 @@ go run main.go --mode client --transport http --city 上海
 #### 启动服务器（终端1）：
 ```bash
 cd /Users/kaitai/project/GopherAI-/common/mcp
-go run main.go --mode server --transport stdio
+go run main.go --mode server --http-addr :8080
 ```
 
 #### 启动客户端（终端2）：
 ```bash
 cd /Users/kaitai/project/GopherAI-/common/mcp
-go run main.go --mode client --transport stdio --city 广州
+go run main.go --mode client --city 广州
 ```
 
 ### 4. 使用包
@@ -58,10 +46,10 @@ import (
 )
 
 // 启动服务器
-server.StartServer("stdio", "")
+server.StartServer(":8080")
 
 // 创建客户端
-mcpClient, _ := client.NewMCPClient("stdio", "go run main.go", "")
+mcpClient, _ := client.NewMCPClient("http://localhost:8080/mcp")
 defer mcpClient.Close()
 
 // 使用客户端
@@ -105,9 +93,6 @@ go test ./...
 --mode string
     运行模式: server 或 client (default "")
 
---transport string
-    传输类型: stdio 或 http (default "stdio")
-
 --http-addr string
     HTTP服务器地址 (default ":8080")
 
@@ -118,11 +103,12 @@ go test ./...
 ## 示例输出
 
 ```
-$ go run main.go --mode server --transport stdio
+$ go run main.go --mode server --http-addr :8080
 启动MCP服务器...
+HTTP MCP server listening on :8080/mcp
 
-$ go run main.go --mode client --transport stdio --city 北京
-正在初始化stdio客户端...
+$ go run main.go --mode client --city 北京
+正在初始化HTTP客户端...
 正在初始化客户端...
 连接到服务器: weather-query-server (版本 1.0.0)
 正在执行健康检查...

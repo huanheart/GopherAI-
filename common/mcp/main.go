@@ -8,14 +8,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/kaitai/gopherai-mcp/client"
-	"github.com/kaitai/gopherai-mcp/server"
+	mcpclient "github.com/kaitai/gopherai-mcp/client"
+	mcpserver "github.com/kaitai/gopherai-mcp/server"
 )
 
 func main() {
 	// 定义命令行标志
 	mode := flag.String("mode", "", "运行模式: server 或 client")
-	transport := flag.String("transport", "stdio", "传输类型: stdio 或 http")
 	httpAddr := flag.String("http-addr", ":8080", "HTTP服务器地址")
 	city := flag.String("city", "", "要查询天气的城市名称")
 	flag.Parse()
@@ -29,7 +28,7 @@ func main() {
 	if *mode == "server" {
 		// 启动服务器
 		fmt.Println("启动MCP服务器...")
-		if err := server.StartServer(*transport, *httpAddr); err != nil {
+		if err := mcpserver.StartServer(*httpAddr); err != nil {
 			log.Fatalf("服务器错误: %v", err)
 		}
 	} else if *mode == "client" {
@@ -44,16 +43,8 @@ func main() {
 		defer cancel()
 
 		// 创建客户端
-		var stdioCmd, httpURL string
-		if *transport == "stdio" {
-			stdioCmd = "go run main.go --mode server --transport stdio"
-			httpURL = ""
-		} else {
-			stdioCmd = ""
-			httpURL = "http://localhost:8080/mcp"
-		}
-
-		mcpClient, err := client.NewMCPClient(*transport, stdioCmd, httpURL)
+		httpURL := "http://localhost:8080/mcp"
+		mcpClient, err := mcpclient.NewMCPClient(httpURL)
 		if err != nil {
 			log.Fatalf("创建客户端失败: %v", err)
 		}
