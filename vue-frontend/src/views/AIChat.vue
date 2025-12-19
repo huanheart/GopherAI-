@@ -116,12 +116,49 @@ export default {
 
     const playTTS = async (text) => {
       try {
-        const response = await api.post('/chat/tts', { text })
-        if (response.data && response.data.status_code === 1000 && response.data.url) {
-          const audio = new Audio(response.data.url)
-          audio.play()
+        // 创建TTS任务
+        const createResponse = await api.post('/AI/chat/tts', { text })
+        if (createResponse.data && createResponse.data.status_code === 1000 && createResponse.data.task_id) {
+          const taskId = createResponse.data.task_id
+          
+          // 轮询查询任务结果
+          const maxAttempts = 15
+          const pollInterval = 2000
+          let attempts = 0
+          let audioURL = ''
+          
+          const pollResult = async () => {
+            const queryResponse = await api.get('/AI/chat/tts/query', { params: { task_id: taskId } })
+            
+            if (queryResponse.data && queryResponse.data.status_code === 1000) {
+              const taskStatus = queryResponse.data.task_status
+              
+              if (taskStatus === 3 && queryResponse.data.task_result) {
+                // 任务完成，播放音频
+                audioURL = queryResponse.data.task_result
+                const audio = new Audio(audioURL)
+                audio.play()
+                return true
+              } else if (taskStatus === 2) {
+                // 任务失败
+                ElMessage.error('语音合成失败')
+                return true
+              }
+            }
+            
+            attempts++
+            if (attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, pollInterval))
+              return await pollResult()
+            } else {
+              ElMessage.error('语音合成超时')
+              return true
+            }
+          }
+          
+          await pollResult()
         } else {
-          ElMessage.error('无法获取语音')
+          ElMessage.error('无法创建语音合成任务')
         }
       } catch (error) {
         console.error('TTS error:', error)
