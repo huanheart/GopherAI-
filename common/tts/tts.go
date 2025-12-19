@@ -9,11 +9,6 @@ import (
 	"net/http"
 )
 
-const (
-	API_KEY    = "Vl4nfabwhipYddiGMTXI1sXZ"
-	SECRET_KEY = "hKzdAp1djkLLU1XsraadhVxLDjdkDVOU"
-)
-
 type TTSService struct{}
 
 type TTSRequest struct {
@@ -33,7 +28,7 @@ type TTSResponse struct {
 
 type QueryResponse struct {
 	TaskID     string `json:"task_id"`
-	TaskStatus int    `json:"task_status"`
+	TaskStatus string `json:"task_status"`
 	TaskResult string `json:"task_result"`
 }
 

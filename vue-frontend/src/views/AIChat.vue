@@ -122,7 +122,7 @@ export default {
           const taskId = createResponse.data.task_id
           
           // 轮询查询任务结果
-          const maxAttempts = 15
+          const maxAttempts = 30
           const pollInterval = 2000
           let attempts = 0
           let audioURL = ''
@@ -133,14 +133,34 @@ export default {
             if (queryResponse.data && queryResponse.data.status_code === 1000) {
               const taskStatus = queryResponse.data.task_status
               
-              if (taskStatus === 3 && queryResponse.data.task_result) {
+              if (taskStatus === 'Success' && queryResponse.data.task_result) {
                 // 任务完成，播放音频
                 audioURL = queryResponse.data.task_result
                 const audio = new Audio(audioURL)
                 audio.play()
                 return true
-              } else if (taskStatus === 2) {
-                // 任务失败
+              } else if (taskStatus === 'Running') {
+                // 任务进行中，继续轮询
+                attempts++
+                if (attempts < maxAttempts) {
+                  await new Promise(resolve => setTimeout(resolve, pollInterval))
+                  return await pollResult()
+                } else {
+                  ElMessage.error('语音合成超时')
+                  return true
+                }
+              } else if (taskStatus === 'Created') {
+                // 任务已创建，继续轮询
+                attempts++
+                if (attempts < maxAttempts) {
+                  await new Promise(resolve => setTimeout(resolve, pollInterval))
+                  return await pollResult()
+                } else {
+                  ElMessage.error('语音合成超时')
+                  return true
+                }
+              } else {
+                // 其他状态（如失败）
                 ElMessage.error('语音合成失败')
                 return true
               }

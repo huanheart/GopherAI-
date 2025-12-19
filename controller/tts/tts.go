@@ -19,7 +19,7 @@ type (
 	}
 	QueryTTSResponse struct {
 		TaskID     string `json:"text,omitempty"`
-		TaskStatus int    `json:"task_status,omitempty"`
+		TaskStatus string `json:"task_status,omitempty"`
 		TaskResult string `json:"task_result,omitempty"`
 		controller.Response
 	}
