@@ -121,36 +121,28 @@ export default {
         if (createResponse.data && createResponse.data.status_code === 1000 && createResponse.data.task_id) {
           const taskId = createResponse.data.task_id
           
+          // 先等待5秒钟再开始轮询
+          await new Promise(resolve => setTimeout(resolve, 5000))
+          
           // 轮询查询任务结果
           const maxAttempts = 30
           const pollInterval = 2000
           let attempts = 0
-          let audioURL = ''
           
           const pollResult = async () => {
             const queryResponse = await api.get('/AI/chat/tts/query', { params: { task_id: taskId } })
             
             if (queryResponse.data && queryResponse.data.status_code === 1000) {
               const taskStatus = queryResponse.data.task_status
-              
+                
               if (taskStatus === 'Success' && queryResponse.data.task_result) {
                 // 任务完成，播放音频
-                audioURL = queryResponse.data.task_result
-                const audio = new Audio(audioURL)
+                // 后端返回的 task_result 是直接的 URL 字符串
+                const audio = new Audio(queryResponse.data.task_result)
                 audio.play()
                 return true
-              } else if (taskStatus === 'Running') {
+              } else if (taskStatus === 'Running' ||taskStatus === 'Created' ) {
                 // 任务进行中，继续轮询
-                attempts++
-                if (attempts < maxAttempts) {
-                  await new Promise(resolve => setTimeout(resolve, pollInterval))
-                  return await pollResult()
-                } else {
-                  ElMessage.error('语音合成超时')
-                  return true
-                }
-              } else if (taskStatus === 'Created') {
-                // 任务已创建，继续轮询
                 attempts++
                 if (attempts < maxAttempts) {
                   await new Promise(resolve => setTimeout(resolve, pollInterval))

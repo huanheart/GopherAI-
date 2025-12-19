@@ -50,6 +50,7 @@ var msg = map[Code]string{
 	AIModelNotFind:    "模型不存在",
 	AIModelCannotOpen: "无法打开模型",
 	AIModelFail:       "模型运行失败",
+	TTSFail:           "语音服务失败",
 }
 
 func (code Code) Code() int64 {

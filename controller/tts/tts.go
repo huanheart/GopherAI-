@@ -4,6 +4,7 @@ import (
 	"GopherAI/common/code"
 	"GopherAI/common/tts"
 	"GopherAI/controller"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -14,11 +15,11 @@ type (
 		Text string `json:"text,omitempty"`
 	}
 	TTSResponse struct {
-		TaskID string `json:"text,omitempty"`
+		TaskID string `json:"task_id,omitempty"`
 		controller.Response
 	}
 	QueryTTSResponse struct {
-		TaskID     string `json:"text,omitempty"`
+		TaskID     string `json:"task_id,omitempty"`
 		TaskStatus string `json:"task_status,omitempty"`
 		TaskResult string `json:"task_result,omitempty"`
 		controller.Response
@@ -50,7 +51,7 @@ func CreateTTSTask(c *gin.Context) {
 	}
 
 	// 创建TTS任务并返回任务ID，由前端轮询查询结果
-	taskID, err := tts.ttsService.CreateTTS(req.Text)
+	taskID, err := tts.ttsService.CreateTTS(c, req.Text)
 	if err != nil {
 		c.JSON(http.StatusOK, res.CodeOf(code.TTSFail))
 		return
@@ -71,15 +72,25 @@ func QueryTTSTask(c *gin.Context) {
 		return
 	}
 
-	response, err := tts.ttsService.QueryTTS(taskID)
+	TTSQueryResponse, err := tts.ttsService.QueryTTSFull(c, taskID)
 	if err != nil {
+		log.Println("语音合成失败", err.Error())
+		c.JSON(http.StatusOK, res.CodeOf(code.TTSFail))
+		return
+	}
+
+	if len(TTSQueryResponse.TasksInfo) == 0 {
 		c.JSON(http.StatusOK, res.CodeOf(code.TTSFail))
 		return
 	}
 
 	res.Success()
-	res.TaskID = response.TaskID
-	res.TaskResult = response.TaskResult
-	res.TaskStatus = response.TaskStatus
+	res.TaskID = TTSQueryResponse.TasksInfo[0].TaskID
+
+	// 检查 TaskResult 是否为 nil，避免空指针异常
+	if TTSQueryResponse.TasksInfo[0].TaskResult != nil {
+		res.TaskResult = TTSQueryResponse.TasksInfo[0].TaskResult.SpeechURL
+	}
+	res.TaskStatus = TTSQueryResponse.TasksInfo[0].TaskStatus
 	c.JSON(http.StatusOK, res)
 }
