@@ -17,11 +17,8 @@ func AIRouter(r *gin.RouterGroup) {
 		r.POST("/chat/history", session.ChatHistory)
 
 		// TTS相关接口
-		{
-			ttsController := tts.NewTTSController()
-			r.POST("/chat/tts", ttsController.CreateTTSTask)
-			r.GET("/chat/tts/query", ttsController.QueryTTSTask)
-		}
+		r.POST("/chat/tts", tts.CreateTTSTask)
+		r.GET("/chat/tts/query", tts.QueryTTSTask)
 
 		r.POST("/chat/send-stream-new-session", session.CreateStreamSessionAndSendMessage)
 		r.POST("/chat/send-stream", session.ChatStreamSend)

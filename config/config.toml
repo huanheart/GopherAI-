@@ -40,3 +40,7 @@ charset =  "utf8mb4"
   docDir = "./docs"
   baseUrl="https://dashscope.aliyuncs.com/compatible-mode/v1"
   dimension=1024
+
+  [voiceServiceConfig]
+  voiceServiceApiKey = "Vl4nfabwhipYddiGMTXI1sXZ"
+  voiceServiceSecretKey ="hKzdAp1djkLLU1XsraadhVxLDjdkDVOU"

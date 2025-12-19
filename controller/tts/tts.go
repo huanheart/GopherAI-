@@ -1,87 +1,85 @@
 package tts
 
 import (
+	"GopherAI/common/code"
 	"GopherAI/common/tts"
+	"GopherAI/controller"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
-type TTSController struct {
+type (
+	TTSRequest struct {
+		Text string `json:"text,omitempty"`
+	}
+	TTSResponse struct {
+		TaskID string `json:"text,omitempty"`
+		controller.Response
+	}
+	QueryTTSResponse struct {
+		TaskID     string `json:"text,omitempty"`
+		TaskStatus int    `json:"task_status,omitempty"`
+		TaskResult string `json:"task_result,omitempty"`
+		controller.Response
+	}
+)
+
+type TTSServices struct {
 	ttsService *tts.TTSService
 }
 
-func NewTTSController() *TTSController {
-	return &TTSController{
+func NewTTSServices() *TTSServices {
+	return &TTSServices{
 		ttsService: tts.NewTTSService(),
 	}
 }
 
-func (c *TTSController) CreateTTSTask(ctx *gin.Context) {
-	var request struct {
-		Text string `json:"text"`
-	}
-
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"status_code": 1001,
-			"status_msg":  "Invalid request body",
-		})
+func CreateTTSTask(c *gin.Context) {
+	tts := NewTTSServices()
+	req := new(TTSRequest)
+	res := new(TTSResponse)
+	if err := c.ShouldBindJSON(req); err != nil {
+		c.JSON(http.StatusOK, res.CodeOf(code.CodeInvalidParams))
 		return
 	}
 
-	if request.Text == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"status_code": 1002,
-			"status_msg":  "Text cannot be empty",
-		})
+	if req.Text == "" {
+		c.JSON(http.StatusOK, res.CodeOf(code.CodeInvalidParams))
 		return
 	}
 
 	// 创建TTS任务并返回任务ID，由前端轮询查询结果
-	taskID, err := c.ttsService.CreateTTS(request.Text)
+	taskID, err := tts.ttsService.CreateTTS(req.Text)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"status_code": 1003,
-			"status_msg":  "Failed to create TTS task",
-			"error":       err.Error(),
-		})
+		c.JSON(http.StatusOK, res.CodeOf(code.TTSFail))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"status_code": 1000,
-		"status_msg":  "Success",
-		"task_id":     taskID,
-	})
+	res.Success()
+	res.TaskID = taskID
+	c.JSON(http.StatusOK, res)
+
 }
 
-func (c *TTSController) QueryTTSTask(ctx *gin.Context) {
-	taskID := ctx.Query("task_id")
+func QueryTTSTask(c *gin.Context) {
+	tts := NewTTSServices()
+	res := new(QueryTTSResponse)
+	taskID := c.Query("task_id")
 	if taskID == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"status_code": 1001,
-			"status_msg":  "Task ID cannot be empty",
-		})
+		c.JSON(http.StatusOK, res.CodeOf(code.CodeInvalidParams))
 		return
 	}
 
-	response, err := c.ttsService.QueryTTS(taskID)
+	response, err := tts.ttsService.QueryTTS(taskID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"status_code": 1003,
-			"status_msg":  "Failed to query TTS task",
-			"error":       err.Error(),
-		})
+		c.JSON(http.StatusOK, res.CodeOf(code.TTSFail))
 		return
 	}
 
-	// 返回任务状态和结果
-	ctx.JSON(http.StatusOK, gin.H{
-		"status_code": 1000,
-		"status_msg":  "Success",
-		"task_id":     response.TaskID,
-		"task_status": response.TaskStatus,
-		"task_result": response.TaskResult,
-	})
+	res.Success()
+	res.TaskID = response.TaskID
+	res.TaskResult = response.TaskResult
+	res.TaskStatus = response.TaskStatus
+	c.JSON(http.StatusOK, res)
 }

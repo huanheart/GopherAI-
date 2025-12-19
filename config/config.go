@@ -56,14 +56,20 @@ type RagModelConfig struct {
 	RagDimension      int    `toml:"dimension"`
 }
 
+type VoiceServiceConfig struct {
+	VoiceServiceApiKey    string `toml:"voiceServiceApiKey"`
+	VoiceServiceSecretKey string `toml:"voiceServiceSecretKey"`
+}
+
 type Config struct {
-	EmailConfig    `toml:"emailConfig"`
-	RedisConfig    `toml:"redisConfig"`
-	MysqlConfig    `toml:"mysqlConfig"`
-	JwtConfig      `toml:"jwtConfig"`
-	MainConfig     `toml:"mainConfig"`
-	Rabbitmq       `toml:"rabbitmqConfig"`
-	RagModelConfig `toml:"ragModelConfig"`
+	EmailConfig        `toml:"emailConfig"`
+	RedisConfig        `toml:"redisConfig"`
+	MysqlConfig        `toml:"mysqlConfig"`
+	JwtConfig          `toml:"jwtConfig"`
+	MainConfig         `toml:"mainConfig"`
+	Rabbitmq           `toml:"rabbitmqConfig"`
+	RagModelConfig     `toml:"ragModelConfig"`
+	VoiceServiceConfig `toml:"voiceServiceConfig"`
 }
 
 type RedisKeyConfig struct {

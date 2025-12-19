@@ -25,6 +25,8 @@ const (
 	AIModelNotFind    Code = 5001
 	AIModelCannotOpen Code = 5002
 	AIModelFail       Code = 5003
+
+	TTSFail Code = 6001
 )
 
 var msg = map[Code]string{

@@ -1,12 +1,12 @@
 package tts
 
 import (
+	"GopherAI/config"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 )
 
 const (
@@ -132,31 +132,11 @@ func (s *TTSService) QueryTTS(taskID string) (QueryResponse, error) {
 	return queryResponse, nil
 }
 
-// 轮询获取TTS结果
-func (s *TTSService) PollTTSResult(taskID string, timeout time.Duration) (string, error) {
-	startTime := time.Now()
-	for {
-		if time.Since(startTime) > timeout {
-			return "", fmt.Errorf("polling timeout")
-		}
-
-		response, err := s.QueryTTS(taskID)
-		if err != nil {
-			return "", err
-		}
-
-		if response.TaskStatus == 3 { // 完成
-			return response.TaskResult, nil
-		}
-
-		time.Sleep(2 * time.Second)
-	}
-}
-
 // 获取Access Token
 func (s *TTSService) GetAccessToken() string {
+	conf := config.GetConfig()
 	url := "https://aip.baidubce.com/oauth/2.0/token"
-	postData := fmt.Sprintf("grant_type=client_credentials&client_id=%s&client_secret=%s", API_KEY, SECRET_KEY)
+	postData := fmt.Sprintf("grant_type=client_credentials&client_id=%s&client_secret=%s", conf.VoiceServiceConfig.VoiceServiceApiKey, conf.VoiceServiceConfig.VoiceServiceSecretKey)
 	resp, err := http.Post(url, "application/x-www-form-urlencoded", bytes.NewReader([]byte(postData)))
 	if err != nil {
 		fmt.Println(err)
