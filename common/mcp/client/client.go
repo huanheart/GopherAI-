@@ -120,7 +120,6 @@ func (m *MCPClient) GetToolResultText(result *mcp.CallToolResult) string {
 	return text
 }
 
-// Close 关闭客户端连接
 func (m *MCPClient) Close() {
 	if m.c != nil {
 		m.c.Close()

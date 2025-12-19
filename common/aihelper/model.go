@@ -332,7 +332,7 @@ func NewMCPModel(ctx context.Context, username string) (*MCPModel, error) {
 		return nil, fmt.Errorf("create mcp model failed: %v", err)
 	}
 
-	mcpBaseURL := "http://localhost:8080/mcp"
+	mcpBaseURL := "http://localhost:8081/mcp"
 
 	return &MCPModel{
 		llm:        llm,
